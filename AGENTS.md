@@ -2,7 +2,7 @@
 
 ### Issue tracker
 
-Issues live in GitHub Issues for `sripwoud/tagwerk` via the `gh` CLI. See `meta/agents/issue-tracker.md`.
+Issues live in GitHub Issues for `espadat-studio/tagwerk` via the `gh` CLI. See `meta/agents/issue-tracker.md`.
 
 ### Triage labels
 

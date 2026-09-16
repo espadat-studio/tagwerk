@@ -21,7 +21,7 @@ from typing import Any, NamedTuple
 Event = dict[str, Any]
 VERSION = "master"
 DESCRIPTION = "Passive work-hours ledger for one Linux desktop."
-REPO_URL = "https://github.com/sripwoud/tagwerk"
+REPO_URL = "https://github.com/espadat-studio/tagwerk"
 EXAMPLES = """examples:
   tagwerk day                 hours per kind/project for the local day
   tagwerk invoice --ago 1     last month's invoice table
