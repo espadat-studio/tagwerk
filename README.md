@@ -66,23 +66,16 @@ pi runs under Bun with its own `PATH`, so the extension spawns `/usr/bin/tagwerk
 
 ## Verify
 
-After 10 minutes with a kitty window focused for part of them:
+After 10 minutes with a kitty window focused for part of them, and one agent turn:
 
 ```sh
-systemctl --user status tagwerk-idle.service tagwerk-focus.service
-tail -n 5 ~/.local/share/tagwerk/$(date -u +%Y-%m).jsonl
+tagwerk doctor
 tagwerk day
 ```
 
-Both units should be `active (running)`. The `focus` lines carry a path in `cwd` while kitty was focused and `null` otherwise, and `day` lists the repo you were in. Leave the machine for three minutes: an `idle` line appears, then `active` when you come back. Poller errors go to `journalctl --user -u tagwerk-focus.service`; systemd restarts it after 5 s.
+`doctor` prints one row per sensor with when it last appended and a verdict, and exits 2 if any row is dark. Three `live` rows mean the poller, the agent hooks and the idle listener all reach the ledger, and `day` lists the repo you were in. A row reads `unknown` when no poll proves the machine was ever on, so there is nothing to measure that sensor's silence against.
 
-After an agent turn in a repo under one of your `[roots]`:
-
-```sh
-grep '"ev": "beat"' ~/.local/share/tagwerk/$(date -u +%Y-%m).jsonl | tail -n 3
-```
-
-A `beat` line carrying that repo's path in `cwd` means the hooks reached the ledger. No line means the hooks are not installed or the agent ran outside every root; `tagwerk beat` drops a cwd it cannot resolve and exits 0, so nothing else reports it. Beats throttle to one per agent and cwd per minute, so check the `ts` on the last line, not the count.
+A dark row names what to fix. A dark `poll` is the focus poller: check `systemctl --user status tagwerk-focus.service` and `journalctl --user -u tagwerk-focus.service`; systemd restarts it after 5 s. A dark `idle mark` is `tagwerk-idle.service`, or hypridle running your own config without the `tagwerk idle` and `tagwerk active` lines. A dark `beat` means the agent hooks above never landed, or every turn ran outside your `[roots]`: `tagwerk beat` drops a cwd it cannot resolve and exits 0, so nothing else reports it.
 
 ## Migrating from timewarrior
 
@@ -119,6 +112,7 @@ Times are local; `HH:MM` means today. Every report takes an optional period in i
 | `tagwerk focus [--once]`                      | the poller; `--once` writes one poll and exits                                                                               |
 | `tagwerk beat SRC [--cwd PATH]`               | an agent signal from `SRC` (`claude` or `pi`); cwd from `--cwd`, else the `cwd` field of JSON on stdin, else the process cwd |
 | `tagwerk idle`, `tagwerk active`              | idle marks, written by hypridle                                                                                              |
+| `tagwerk doctor`                              | one row per sensor (poll, beat, idle mark) with its last event and a `live`, `dark` or `unknown` verdict; exits 2 on dark    |
 | `tagwerk --version`                           | the git revision the package was built from, or `master` from a checkout (ADR-0007)                                          |
 | `tagwerk --config PATH CMD`                   | read this config; beats `TAGWERK_CONFIG`, which beats `~/.config/tagwerk/config.toml`                                        |
 | `tagwerk --data-dir PATH CMD`                 | read and write this ledger directory; beats `TAGWERK_DATA_DIR`, which beats `data_dir` in the config; `init` rejects it      |
@@ -155,7 +149,7 @@ Both flags go before the subcommand. Reports colour only when both stdout and st
 - Colours come from five hues that pass the contrast check; past a handful of work repos two will share one.
 - Spans written before `ts` carried microseconds resolve by file order when two of them share a second across month files; their append order was never recorded, so no rewrite can fix it (ADR-0009).
 - Reports rescan the month files on every run; a month is about 43k minutes and a few thousand events, fine for years of data.
-- A dark sensor raises no warning: nothing cross-checks that the three sensors are still appending, so `day`, `week` and `invoice` print plausible numbers over missing input. Rerun Verify after any change to the hooks or the roots, until a health check ships.
+- `doctor` cannot tell a sensor that is deliberately unwired from one that broke, so a machine that runs no agents reports `beat` dark for good. Raise `sensor_dark_h` or read past that row.
 - One machine, no web UI, no sync, no `--json`, no notifications.
 
 ## Development

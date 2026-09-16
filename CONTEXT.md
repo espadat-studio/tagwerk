@@ -26,6 +26,18 @@ _Avoid_: heartbeat, ping
 The shortest gap between two beats from the same agent in the same cwd. A beat inside it is dropped, which loses nothing: the lease it would renew is still running.
 _Avoid_: debounce, rate limit, cooldown
 
+**Dark**:
+A sensor that has appended nothing while the machine was demonstrably on, for long enough that its silence is more likely a wiring fault than a true absence of signal.
+_Avoid_: broken, down, stale
+
+**Live**:
+A sensor that has appended recently enough, measured against the most recent poll, to rule out a wiring fault.
+_Avoid_: healthy, up, ok, green
+
+**Unknown**:
+A sensor whose silence cannot be judged, because no poll proves the machine was ever on. Never a fault in itself: an empty ledger says nothing about wiring.
+_Avoid_: unchecked, n/a, no data
+
 **Span**:
 A manually entered or imported interval that overrides the sensors for its whole range. The latest appended span wins on overlap.
 _Avoid_: interval, entry, correction

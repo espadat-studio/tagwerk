@@ -41,6 +41,7 @@ PALETTE = (166, 36, 176, 61, 142)
 
 
 CATCH_ALLS = ("general", "other")
+SENSORS = (("poll", ("focus",)), ("beat", ("beat",)), ("idle mark", ("idle", "active")))
 
 
 class Bucket(NamedTuple):
@@ -50,6 +51,13 @@ class Bucket(NamedTuple):
     @property
     def is_repo(self) -> bool:
         return self.project not in CATCH_ALLS
+
+
+class Finding(NamedTuple):
+    sensor: str
+    when: str
+    age: str
+    verdict: str
 
 
 OTHER = Bucket("personal", "other")
@@ -63,6 +71,7 @@ TitleRule = tuple[re.Pattern[str], str, str | None]
 class Config:
     data_dir: Path
     poll_stale: timedelta
+    sensor_dark: timedelta
     beat_lease: timedelta
     beat_throttle: timedelta
     focus_lease: timedelta
@@ -89,6 +98,7 @@ poll_stale_min = 2 # a poll this recent proves the machine was on
 beat_lease_min = 10 # an agent beat leases its repo this long
 beat_throttle_sec = 60 # an agent appends at most one beat per cwd this often
 focus_lease_min = 1 # a focused kitty cwd or GitHub repo title leases its repo this long
+sensor_dark_h = 168 # a week; tagwerk doctor calls a sensor this quiet dark, measured against the last poll
 kitty_socket = "unix:${XDG_RUNTIME_DIR}/omarchy-kitty-{pid}" # Omarchy default; {pid} is the focused kitty's pid
 day_cap_h = 8 # week labels turn red above this; caps change colours, never numbers
 week_cap_h = 40 # the week footer and month week bars turn red above this
@@ -154,6 +164,7 @@ def load_config(path: Path, data_dir: Path | None) -> Config:
         data_dir=Path(chosen).expanduser(),
         poll_sec=raw.get("poll_sec", 15),
         poll_stale=timedelta(minutes=raw.get("poll_stale_min", 2)),
+        sensor_dark=timedelta(hours=raw.get("sensor_dark_h", 168)),
         beat_lease=timedelta(minutes=raw.get("beat_lease_min", 10)),
         beat_throttle=timedelta(seconds=raw.get("beat_throttle_sec", 60)),
         focus_lease=timedelta(minutes=raw.get("focus_lease_min", 1)),
@@ -577,6 +588,45 @@ def cmd_month(config: Config, first: date) -> None:
     print("\n".join([*bars, "", render_table(merge(days.values()))]))
 
 
+def format_age(age: timedelta) -> str:
+    minutes = int(age.total_seconds() // 60)
+    if minutes < 60:
+        return f"{minutes}m"
+    if minutes < 24 * 60:
+        return f"{minutes // 60}h"
+    return f"{minutes // (24 * 60)}d"
+
+
+def last_seen(data_dir: Path) -> dict[str, datetime]:
+    # ponytail: scans every month file for a handful of last events, like import-timew; read newest-first if it drags
+    events = read_events(data_dir, EPOCH, datetime.now(UTC))
+    return {event["ev"]: datetime.fromisoformat(event["ts"]) for event in events}
+
+
+def verdict(last: datetime | None, against: datetime | None, dark_after: timedelta) -> str:
+    if against is None:
+        return "unknown"
+    return "dark" if last is None or against - last > dark_after else "live"
+
+
+def cmd_doctor(config: Config) -> int:
+    seen = last_seen(config.data_dir)
+    now = datetime.now(UTC)
+    findings = []
+    for sensor, marks in SENSORS:
+        last = max((seen[mark] for mark in marks if mark in seen), default=None)
+        # ponytail: the poller is the reference, so it alone measures against now; the rest need a poll to be judged
+        against = now if "focus" in marks else seen.get("focus")
+        when = f"{last.astimezone():%Y-%m-%d %H:%M}" if last else "never"
+        age = f"{format_age(now - last)} ago" if last else "-"
+        findings.append(Finding(sensor, when, age, verdict(last, against, config.sensor_dark)))
+    widths = [max(len(cell) for cell in column) for column in zip(*findings, strict=True)]
+    for row in findings:
+        line = f"{row.sensor:<{widths[0]}}  {row.when:<{widths[1]}}  {row.age:<{widths[2]}}  {row.verdict}"
+        print(paint(line, RED) if row.verdict == "dark" else line)
+    return 2 if any(row.verdict == "dark" for row in findings) else 0
+
+
 def main(argv: list[str]) -> int:
     brief = f"{DESCRIPTION}\n\n{EXAMPLES}"
     if not argv:
@@ -640,6 +690,11 @@ def main(argv: list[str]) -> int:
     beat.add_argument(
         "--cwd", help="the agent's working directory; default the cwd field of JSON on stdin, else the process cwd"
     )
+    commands.add_parser(
+        "doctor",
+        parents=[plain],
+        help="one row per sensor with its last event and verdict; exits 2 when any sensor is dark",
+    )
     commands.add_parser("idle", help="mark the start of idle, from the hypridle listener or before sleep")
     commands.add_parser("active", help="mark the end of idle, from the hypridle listener or after sleep")
     args = parser.parse_args(argv)
@@ -670,6 +725,8 @@ def main(argv: list[str]) -> int:
         cmd_import_timew(config, args.work_tag, args.file)
     elif args.command == "day":
         report(config, *local_day(args.period or local_today() - timedelta(days=args.ago)), render_table)
+    elif args.command == "doctor":
+        return cmd_doctor(config)
     return 0
 
 
