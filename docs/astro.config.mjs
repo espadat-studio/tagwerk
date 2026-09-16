@@ -28,6 +28,8 @@ export default defineConfig({
             { slug: "getting-started/verification" },
           ],
         },
+        { slug: "configuration" },
+        { slug: "cli-reference" },
       ],
     }),
   ],

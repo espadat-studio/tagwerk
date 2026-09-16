@@ -30,16 +30,7 @@ The agent hooks are part of that install, not an optional extra: without them a 
 
 ## Configuration
 
-In the config, point `[roots]` at your work org's clone directory as `work` and at your personal code directory as `personal`. A fixed-price customer's directory is `fixed`: paid, so it counts toward the week cap, but never on the hourly customer's invoice. Make the `[[title]]` patterns match your org's GitHub titles and chat apps. A rule that cannot work is rejected when the config loads, named by its position and its pattern: no `pattern`, no `kind`, a `pattern` that is no regex, or nothing to name the project with. The longest root wins. The project is the first directory below the root, cut at its first dot, so `assets.8467` and `assets` are one project. Every other key ships with its default; the comments in the file `tagwerk init` writes explain each one.
-
-| kind       | counts toward the week cap | on the invoice |
-| ---------- | :------------------------: | :------------: |
-| `work`     |            yes             |      yes       |
-| `fixed`    |            yes             |       no       |
-| `personal` |             no             |       no       |
-| `off`      |             no             |       no       |
-
-The day cap asks a different question and no kind answers it: it counts every credited minute, `personal` included (ADR-0011). A kind never names the payer. `off` belongs to a span, not to a root or a title rule: the config rejects it there, and `tagwerk fix --kind off` books it.
+Point `[roots]` at your work org's clone directory as `work` and at your personal code directory as `personal`, and make the `[[title]]` patterns match your org's GitHub titles and chat apps. [Configuration](https://tagwerk.espadat.com/configuration/) covers every key with its default, which kinds are paid and which reach the invoice, and how a rule that cannot work is rejected when the config loads.
 
 ## Omarchy bar widget
 
@@ -85,53 +76,7 @@ The sleep hook belongs to no package and runs `timew stop` on every suspend. Tim
 
 ## Commands
 
-Times are local; `HH:MM` means today. Every report takes an optional period in its own unit, or `--ago N` counted in that same unit. The two are mutually exclusive. With neither, the report covers the current period.
-
-| Command                                       | Does                                                                                                                                                                                                                              |
-| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `tagwerk`                                     | the description, two examples and where to go next; no command is not an error                                                                                                                                                    |
-| `tagwerk init`                                | write the commented config template to `~/.config/tagwerk/config.toml`; refuses to overwrite                                                                                                                                      |
-| `tagwerk day [YYYY-MM-DD] [--json]`           | hours per `kind/project` for the local day, the paid `work` subtotal, total; `--json` prints the same figures as one object                                                                                                       |
-| `tagwerk week [YYYY-Www]`                     | one bar per day, Monday to Sunday; cap marker, red over the day cap or on a weekend with minutes                                                                                                                                  |
-| `tagwerk month [YYYY-MM]`                     | one bar per ISO week, then hours per `kind/project`                                                                                                                                                                               |
-| `tagwerk invoice [YYYY-MM]`                   | markdown table of `work` hours per project in quarter hours; rows sum to the rounded total; `fixed` never appears                                                                                                                 |
-| `tagwerk fix START END PROJECT [--kind KIND]` | book a span that overrides the sensors for its range; `KIND` is `work` (default), `fixed`, `personal` or `off`                                                                                                                    |
-| `tagwerk import-timew --work-tag TAG [FILE]`  | one-shot import of the timewarrior export as spans; runs `timew export` when `FILE` is omitted                                                                                                                                    |
-| `tagwerk focus [--once]`                      | the poller; `--once` writes one poll and exits                                                                                                                                                                                    |
-| `tagwerk beat SRC [--cwd PATH]`               | an agent signal from `SRC` (`claude` or `pi`); cwd from `--cwd`, else the `cwd` field of JSON on stdin, else the process cwd                                                                                                      |
-| `tagwerk idle`, `tagwerk active`              | idle marks, written by hypridle                                                                                                                                                                                                   |
-| `tagwerk doctor`                              | one row per sensor (poll, beat, idle mark) with its last event and a `live`, `dark` or `unknown` verdict, then whether each agent hook is `wired`, then any `suspect` root or title pattern; exits 2 on dark, 3 on suspect config |
-| `tagwerk --version`                           | the git revision the package was built from, or `master` from a checkout (ADR-0007)                                                                                                                                               |
-| `tagwerk --config PATH CMD`                   | read this config; beats `TAGWERK_CONFIG`, which beats `~/.config/tagwerk/config.toml`                                                                                                                                             |
-| `tagwerk --data-dir PATH CMD`                 | read and write this ledger directory; beats `TAGWERK_DATA_DIR`, which beats `data_dir` in the config; `init` rejects it                                                                                                           |
-
-```sh
-tagwerk fix 14:00 15:00 assets
-tagwerk fix 09:00 12:00 auberge --kind fixed
-tagwerk fix 2026-09-08T09:00 2026-09-08T10:00 blog --kind personal
-tagwerk fix 12:00 13:00 lunch --kind off
-tagwerk week --ago 1
-tagwerk invoice 2026-08
-tagwerk --config ~/side-gig/tagwerk.toml invoice 2026-08
-```
-
-Both flags go before the subcommand. Reports colour only when both stdout and stderr are terminals; `--no-color`, `NO_COLOR` and `TERM=dumb` each turn it off, and `FORCE_COLOR` overrides all three.
-
-`day --json` prints one object on stdout and never colours. Buckets come in the table's own order, every minute value is a rounded integer, and `over_cap` compares `total_minutes` against `cap_minutes`, the day cap (ADR-0011). Buckets round one by one and the total rounds the raw sum, so the rows need not add up to it, exactly as in the table.
-
-```json
-{
-  "day": "2026-09-16",
-  "buckets": [
-    { "kind": "work", "project": "tagwerk", "minutes": 312 },
-    { "kind": "personal", "project": "auberge", "minutes": 47 }
-  ],
-  "paid_minutes": 312,
-  "total_minutes": 359,
-  "cap_minutes": 480,
-  "over_cap": false
-}
-```
+`day`, `week`, `month` and `invoice` report; `fix` appends a span; `focus`, `beat`, `idle` and `active` are the sensors; `init` and `doctor` set up and check. [CLI reference](https://tagwerk.espadat.com/cli-reference/) has every command with its flags.
 
 ## Attribution notes
 
