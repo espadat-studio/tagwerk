@@ -21,7 +21,7 @@
   "packageRules": [
     {
       "description": "The hk binary (.config/mise.toml) and the hk Pkl schema (hk.pkl) must move together, including on major bumps that group:allNonMajor splits",
-      "matchDepNames": ["hk"],
+      "matchDepNames": ["hk", "aqua:jdx/hk"],
       "groupName": "hk"
     },
     {
