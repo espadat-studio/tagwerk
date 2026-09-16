@@ -1902,3 +1902,103 @@ def test_doctor_keeps_its_exit_code_when_a_dark_sensor_meets_unwired_hooks(
     rows = doctor(capsys, 2)
     assert per_sensor(rows)["beat"] == ["never", "-", "dark"]
     assert per_piece(rows) == {"claude hooks": "unknown", "pi extension": "missing"}
+
+
+TYPO_ROOT = """[roots]
+"~/code/typo" = "work"
+"""
+
+ZOOM_TITLE = r"""[[title]]
+pattern = '(?i)zoom|meet\.google'
+kind = "work"
+project = "general"
+"""
+
+
+def configured_ledger(home: Path, monkeypatch: pytest.MonkeyPatch, config: str) -> Path:
+    path = home / "config.toml"
+    path.write_text(f'data_dir = "{home}/data"\n{config}')
+    monkeypatch.setenv("TAGWERK_CONFIG", str(path))
+    return home / "data"
+
+
+def live_with(home: Path, monkeypatch: pytest.MonkeyPatch, config: str, *events: Event) -> None:
+    data = configured_ledger(home, monkeypatch, config)
+    live(data)
+    seed(data, *events)
+
+
+def test_doctor_stays_silent_about_config_when_every_root_exists_and_every_pattern_matched(
+    home: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (home / "code/live").mkdir(parents=True)
+    config = '[roots]\n"~/code/live" = "work"\n' + ZOOM_TITLE
+    live_with(home, monkeypatch, config, poll(ago(minutes=3), title="Zoom Meeting"))
+    assert len(blocks(doctor(capsys, 0))) == 2
+
+
+@pytest.mark.parametrize("as_file", [False, True])
+def test_doctor_calls_a_root_that_is_no_directory_suspect_and_names_it_as_the_config_wrote_it(
+    home: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], as_file: bool
+) -> None:
+    (home / "code").mkdir()
+    if as_file:
+        (home / "code/typo").write_text("a file is no cwd either")
+    live_with(home, monkeypatch, TYPO_ROOT)
+    (row,) = blocks(doctor(capsys, 3))[2]
+    assert row.startswith("root '~/code/typo'")
+    assert row.endswith("suspect")
+    assert "personal/other" in row
+
+
+def test_doctor_calls_a_title_pattern_that_matched_no_ledger_title_suspect(
+    home: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    live_with(home, monkeypatch, ZOOM_TITLE)
+    (row,) = blocks(doctor(capsys, 3))[2]
+    assert row.startswith(r"title '(?i)zoom|meet\.google'")
+    assert row.endswith("suspect")
+    assert "never ran" in row
+
+
+def test_doctor_clears_a_title_pattern_that_matched_any_title_in_the_whole_ledger(
+    home: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    live_with(home, monkeypatch, ZOOM_TITLE, poll(ago(days=40), title="Zoom Meeting"))
+    assert len(blocks(doctor(capsys, 0))) == 2
+
+
+def test_doctor_reports_a_dark_sensor_over_suspect_config(
+    home: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    seed(configured_ledger(home, monkeypatch, TYPO_ROOT), poll(ago(minutes=2)))
+    rows = doctor(capsys, 2)
+    assert [cells[-1] for cells in per_sensor(rows).values()] == ["live", "dark", "dark"]
+    assert blocks(rows)[2][0].endswith("suspect")
+
+
+def test_doctor_leaves_a_suspect_row_unpainted_because_the_config_may_be_deliberate(
+    home: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("FORCE_COLOR", "1")
+    live_with(home, monkeypatch, TYPO_ROOT)
+    assert "\033[" not in blocks(doctor(capsys, 3))[2][0]
+
+
+def test_doctor_skips_a_focus_event_that_carries_no_title_instead_of_dying_on_it(
+    home: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    untitled: Event = {"ts": stamp(ago(minutes=5)), "ev": "focus", "class": "x", "cwd": None}
+    live_with(home, monkeypatch, ZOOM_TITLE, poll(ago(minutes=4), title=None), untitled)
+    assert blocks(doctor(capsys, 3))[2][0].startswith(r"title '(?i)zoom|meet\.google'")
+
+
+def test_doctor_reads_every_entry_of_an_unedited_config_template_as_suspect(
+    ledger: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    live(ledger)
+    rows = blocks(doctor(capsys, 3))[2]
+    assert len(rows) == 5
+    assert all(row.endswith("suspect") for row in rows)
+    assert rows[0].startswith("root '~/code/work-org'")
+    assert rows[3].startswith(r"title 'work-org/(?P<project>[\w.-]+)'")

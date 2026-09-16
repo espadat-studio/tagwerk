@@ -75,9 +75,22 @@ tagwerk doctor
 tagwerk day
 ```
 
-`doctor` prints one row per sensor with when it last appended and a verdict, and exits 2 if any row is dark. Three `live` rows mean the poller, the agent hooks and the idle listener all reach the ledger, and `day` lists the repo you were in. A row reads `unknown` when no poll proves the machine was ever on, so there is nothing to measure that sensor's silence against.
+`doctor` prints one row per sensor with when it last appended and a verdict. Three `live` rows mean the poller, the agent hooks and the idle listener all reach the ledger, and `day` lists the repo you were in. A row reads `unknown` when no poll proves the machine was ever on, so there is nothing to measure that sensor's silence against.
 
 Below the sensors, `doctor` reports the two [agent hook](#agent-hooks) installs: `wired`, `missing` with the command to type, or `unknown` when it cannot read `~/.claude/settings.json`. The settings schema is Anthropic's, so a file that is absent, unreadable or shaped unexpectedly reads `unknown` rather than a false `missing`. Wiring is advisory and never changes the exit code.
+
+Last, `doctor` lists config that cannot be doing anything: a root that is no directory on disk, and a `[[title]]` pattern that no title in the ledger ever matched. Both read `suspect`, never dark — a root may sit on an unmounted drive, and a pattern may simply describe an app you have not opened. Each row names the path or pattern as your config wrote it, so you can grep for the line, and says where the minutes go instead.
+
+A config straight from `tagwerk init` reads suspect in every root and pattern until you edit it, because the template names an org that is not yours. That is the check working, not a fault, and it is why `tagwerk init && $EDITOR ~/.config/tagwerk/config.toml` is one command in the install.
+
+Exit codes let a shell prompt or a timer alarm on wiring without a suspect pattern lighting it up:
+
+| Code | Means                                              |
+| ---: | -------------------------------------------------- |
+|    0 | every sensor live and no suspect config            |
+|    1 | tagwerk itself failed                              |
+|    2 | at least one sensor dark, whatever the config says |
+|    3 | every sensor live, but the config is suspect       |
 
 A dark row names what to fix. A dark `poll` is the focus poller: check `systemctl --user status tagwerk-focus.service` and `journalctl --user -u tagwerk-focus.service`; systemd restarts it after 5 s. A dark `idle mark` is `tagwerk-idle.service`, or hypridle running your own config without the `tagwerk idle` and `tagwerk active` lines. A dark `beat` means the agent hooks above never landed, or every turn ran outside your `[roots]`: `tagwerk beat` drops a cwd it cannot resolve and exits 0, so nothing else reports it. The wiring rows tell the two apart: a `missing` row is the install you still owe, two `wired` rows point at `[roots]`.
 
@@ -103,23 +116,23 @@ The sleep hook belongs to no package and runs `timew stop` on every suspend. Tim
 
 Times are local; `HH:MM` means today. Every report takes an optional period in its own unit, or `--ago N` counted in that same unit. The two are mutually exclusive. With neither, the report covers the current period.
 
-| Command                                       | Does                                                                                                                                                               |
-| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `tagwerk`                                     | the description, two examples and where to go next; no command is not an error                                                                                     |
-| `tagwerk init`                                | write the commented config template to `~/.config/tagwerk/config.toml`; refuses to overwrite                                                                       |
-| `tagwerk day [YYYY-MM-DD]`                    | hours per `kind/project` for the local day, the paid `work` subtotal, total                                                                                        |
-| `tagwerk week [YYYY-Www]`                     | one bar per day, Monday to Sunday; cap marker, red over the day cap or on a weekend with minutes                                                                   |
-| `tagwerk month [YYYY-MM]`                     | one bar per ISO week, then hours per `kind/project`                                                                                                                |
-| `tagwerk invoice [YYYY-MM]`                   | markdown table of `work` hours per project in quarter hours; rows sum to the rounded total; `fixed` never appears                                                  |
-| `tagwerk fix START END PROJECT [--kind KIND]` | book a span that overrides the sensors for its range; `KIND` is `work` (default), `fixed`, `personal` or `off`                                                     |
-| `tagwerk import-timew --work-tag TAG [FILE]`  | one-shot import of the timewarrior export as spans; runs `timew export` when `FILE` is omitted                                                                     |
-| `tagwerk focus [--once]`                      | the poller; `--once` writes one poll and exits                                                                                                                     |
-| `tagwerk beat SRC [--cwd PATH]`               | an agent signal from `SRC` (`claude` or `pi`); cwd from `--cwd`, else the `cwd` field of JSON on stdin, else the process cwd                                       |
-| `tagwerk idle`, `tagwerk active`              | idle marks, written by hypridle                                                                                                                                    |
-| `tagwerk doctor`                              | one row per sensor (poll, beat, idle mark) with its last event and a `live`, `dark` or `unknown` verdict, then whether each agent hook is `wired`; exits 2 on dark |
-| `tagwerk --version`                           | the git revision the package was built from, or `master` from a checkout (ADR-0007)                                                                                |
-| `tagwerk --config PATH CMD`                   | read this config; beats `TAGWERK_CONFIG`, which beats `~/.config/tagwerk/config.toml`                                                                              |
-| `tagwerk --data-dir PATH CMD`                 | read and write this ledger directory; beats `TAGWERK_DATA_DIR`, which beats `data_dir` in the config; `init` rejects it                                            |
+| Command                                       | Does                                                                                                                                                                                                                              |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tagwerk`                                     | the description, two examples and where to go next; no command is not an error                                                                                                                                                    |
+| `tagwerk init`                                | write the commented config template to `~/.config/tagwerk/config.toml`; refuses to overwrite                                                                                                                                      |
+| `tagwerk day [YYYY-MM-DD]`                    | hours per `kind/project` for the local day, the paid `work` subtotal, total                                                                                                                                                       |
+| `tagwerk week [YYYY-Www]`                     | one bar per day, Monday to Sunday; cap marker, red over the day cap or on a weekend with minutes                                                                                                                                  |
+| `tagwerk month [YYYY-MM]`                     | one bar per ISO week, then hours per `kind/project`                                                                                                                                                                               |
+| `tagwerk invoice [YYYY-MM]`                   | markdown table of `work` hours per project in quarter hours; rows sum to the rounded total; `fixed` never appears                                                                                                                 |
+| `tagwerk fix START END PROJECT [--kind KIND]` | book a span that overrides the sensors for its range; `KIND` is `work` (default), `fixed`, `personal` or `off`                                                                                                                    |
+| `tagwerk import-timew --work-tag TAG [FILE]`  | one-shot import of the timewarrior export as spans; runs `timew export` when `FILE` is omitted                                                                                                                                    |
+| `tagwerk focus [--once]`                      | the poller; `--once` writes one poll and exits                                                                                                                                                                                    |
+| `tagwerk beat SRC [--cwd PATH]`               | an agent signal from `SRC` (`claude` or `pi`); cwd from `--cwd`, else the `cwd` field of JSON on stdin, else the process cwd                                                                                                      |
+| `tagwerk idle`, `tagwerk active`              | idle marks, written by hypridle                                                                                                                                                                                                   |
+| `tagwerk doctor`                              | one row per sensor (poll, beat, idle mark) with its last event and a `live`, `dark` or `unknown` verdict, then whether each agent hook is `wired`, then any `suspect` root or title pattern; exits 2 on dark, 3 on suspect config |
+| `tagwerk --version`                           | the git revision the package was built from, or `master` from a checkout (ADR-0007)                                                                                                                                               |
+| `tagwerk --config PATH CMD`                   | read this config; beats `TAGWERK_CONFIG`, which beats `~/.config/tagwerk/config.toml`                                                                                                                                             |
+| `tagwerk --data-dir PATH CMD`                 | read and write this ledger directory; beats `TAGWERK_DATA_DIR`, which beats `data_dir` in the config; `init` rejects it                                                                                                           |
 
 ```sh
 tagwerk fix 14:00 15:00 assets
@@ -154,6 +167,9 @@ Both flags go before the subcommand. Reports colour only when both stdout and st
 - Spans written before `ts` carried microseconds resolve by file order when two of them share a second across month files; their append order was never recorded, so no rewrite can fix it (ADR-0009).
 - Reports rescan the month files on every run; a month is about 43k minutes and a few thousand events, fine for years of data.
 - `doctor` cannot tell a sensor that is deliberately unwired from one that broke, so a machine that runs no agents reports `beat` dark for good. Raise `sensor_dark_h` or read past that row.
+- `doctor` judges a root by whether it is a directory right now, so a root on an unmounted drive reads `suspect` until you mount it. It costs a row and exit 3, never a number in a report.
+- `doctor` tests each `[[title]]` pattern against every title on its own, so a pattern permanently shadowed by an earlier one still reads clear. Attribution takes the first match, and replaying that order across the whole ledger would cost more than the typo it would catch.
+- Exit 2 is shared: argparse spends it on a usage error, so `tagwerk doctor --bogus` alarms a prompt exactly as a dark sensor does.
 - One machine, no web UI, no sync, no `--json`, no notifications.
 
 ## Development
