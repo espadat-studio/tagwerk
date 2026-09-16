@@ -66,9 +66,13 @@ def berlin() -> Iterator[None]:
     time.tzset()
 
 
-def lines(capsys: pytest.CaptureFixture[str], *argv: str) -> list[str]:
-    assert tagwerk.main(list(argv)) == 0
+def lines(capsys: pytest.CaptureFixture[str], *argv: str, code: int = 0) -> list[str]:
+    assert tagwerk.main(list(argv)) == code
     return capsys.readouterr().out.splitlines()
+
+
+def uncolored(text: str) -> str:
+    return re.sub(r"\033\[[0-9;]*m", "", text)
 
 
 def run(capsys: pytest.CaptureFixture[str], *argv: str) -> list[list[str]]:
@@ -130,6 +134,7 @@ def seed(ledger: Path, *events: Event) -> None:
         ["focus"],
         ["import-timew"],
         ["beat"],
+        ["doctor"],
         ["idle"],
         ["active"],
     ],
@@ -1652,7 +1657,7 @@ def test_caps_come_from_the_config_and_change_colours_but_never_numbers(
     assert out[2].endswith("5:00")
     assert out[7] == "work 3:00 / 4:00"
     _, _, bar, _ = out[2].split()
-    assert re.sub(r"\033\[[0-9;]*m", "", bar).index("│") == 8
+    assert uncolored(bar).index("│") == 8
     august = lines(capsys, "month", "2026-08")
     assert august[1].startswith(f"{tagwerk.RED}W32{tagwerk.RESET}")
     assert august[1].endswith("5:00")
@@ -1678,3 +1683,90 @@ def test_month_shows_one_bar_per_iso_week_that_agrees_with_the_table(
         ["work", "5:00"],
         ["total", "6:00"],
     ]
+
+
+NOW = datetime.now(UTC)
+
+
+def ago(**delta: float) -> datetime:
+    return NOW - timedelta(**delta)
+
+
+def doctor(capsys: pytest.CaptureFixture[str], code: int, *argv: str) -> list[str]:
+    return lines(capsys, "doctor", *argv, code=code)
+
+
+def per_sensor(rows: list[str]) -> dict[str, list[str]]:
+    return {sensor: rest.split() for sensor, _, rest in (uncolored(row).partition("  ") for row in rows)}
+
+
+def test_doctor_reports_one_live_row_per_sensor_with_its_local_time_and_age(
+    ledger: Path, berlin: None, capsys: pytest.CaptureFixture[str]
+) -> None:
+    seed(ledger, mark(ago(minutes=2), "focus"), beat(ago(hours=3), "~/code/blog"), mark(ago(hours=5), "idle"))
+    rows = per_sensor(doctor(capsys, 0))
+    assert list(rows) == ["poll", "beat", "idle mark"]
+    assert [cells[-1] for cells in rows.values()] == ["live", "live", "live"]
+    assert rows["poll"][0] == f"{ago(minutes=2).astimezone():%Y-%m-%d}"
+    assert [cells[2:4] for cells in rows.values()] == [["2m", "ago"], ["3h", "ago"], ["5h", "ago"]]
+
+
+def test_doctor_calls_a_sensor_that_never_appended_dark(ledger: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    seed(ledger, mark(ago(minutes=2), "focus"), mark(ago(hours=2), "active"))
+    rows = per_sensor(doctor(capsys, 2))
+    assert rows["beat"] == ["never", "-", "dark"]
+    assert [cells[-1] for cells in rows.values()] == ["live", "dark", "live"]
+
+
+def test_doctor_calls_a_sensor_that_went_quiet_mid_ledger_dark(
+    ledger: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    seed(ledger, mark(ago(days=9), "focus"), beat(ago(days=9), "~/code/blog"), mark(ago(days=9), "idle"))
+    seed(ledger, mark(ago(minutes=2), "focus"), mark(ago(hours=2), "idle"))
+    assert per_sensor(doctor(capsys, 2))["beat"][2:] == ["9d", "ago", "dark"]
+
+
+def test_doctor_on_an_empty_ledger_reports_a_dark_poll_and_judges_nothing_else(
+    data_dir: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    rows = per_sensor(doctor(capsys, 2))
+    assert [cells[-1] for cells in rows.values()] == ["dark", "unknown", "unknown"]
+    assert {cells[0] for cells in rows.values()} == {"never"}
+
+
+def test_doctor_judges_quiet_sensors_against_the_last_poll_not_the_wall_clock(
+    ledger: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    seed(ledger, mark(ago(days=14), "focus"), beat(ago(days=14, minutes=5), "~/code/blog"), mark(ago(days=14), "idle"))
+    rows = per_sensor(doctor(capsys, 2))
+    assert [cells[-1] for cells in rows.values()] == ["dark", "live", "live"]
+    assert {cells[2] for cells in rows.values()} == {"14d"}
+
+
+def test_doctor_paints_only_the_dark_row_red_and_drops_it_for_no_color(
+    ledger: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("FORCE_COLOR", "1")
+    seed(ledger, mark(ago(minutes=2), "focus"), mark(ago(hours=2), "idle"))
+    poll, beats, idle = doctor(capsys, 2)
+    assert (beats.startswith(tagwerk.RED), beats.endswith(tagwerk.RESET)) == (True, True)
+    assert "\033[" not in poll + idle
+    monkeypatch.delenv("FORCE_COLOR")
+    assert "\033[" not in "\n".join(doctor(capsys, 2, "--no-color"))
+
+
+def test_doctor_takes_its_darkness_threshold_from_the_config(
+    home: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (home / "config.toml").write_text(f'data_dir = "{home}/data"\nsensor_dark_h = 1\n')
+    monkeypatch.setenv("TAGWERK_CONFIG", str(home / "config.toml"))
+    seed(home / "data", mark(ago(minutes=2), "focus"), beat(ago(hours=3), "~/code/blog"), mark(ago(minutes=3), "idle"))
+    assert [cells[-1] for cells in per_sensor(doctor(capsys, 2)).values()] == ["live", "dark", "live"]
+
+
+def test_doctor_findings_go_to_stdout(ledger: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    seed(ledger, mark(ago(minutes=2), "focus"))
+    assert tagwerk.main(["doctor"]) == 2
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    assert len(captured.out.splitlines()) == 3
