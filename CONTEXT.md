@@ -42,6 +42,10 @@ _Avoid_: unchecked, n/a, no data
 The installed path by which a sensor reaches the ledger: a Claude Code hook that runs `tagwerk beat`, the pi extension symlink. Each piece reads **wired** when it is installed and **missing** when it is not. A missing piece explains a dark sensor; it is never an alarm of its own.
 _Avoid_: setup, integration, plumbing
 
+**Suspect**:
+Configuration that cannot be doing anything: a root that is no directory, or a `[[title]]` pattern that has never matched a title in the ledger. Advisory, never a fault: the drive may be unmounted, or the app may simply not have run.
+_Avoid_: unused, dead, invalid, broken
+
 **Span**:
 A manually entered or imported interval that overrides the sensors for its whole range. The latest appended span wins on overlap.
 _Avoid_: interval, entry, correction

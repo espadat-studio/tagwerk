@@ -8,6 +8,7 @@ import sys
 import time
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
+from itertools import groupby
 from pathlib import Path
 from typing import Any
 
@@ -58,6 +59,14 @@ def ledger(home: Path) -> Path:
 
 
 @pytest.fixture
+def bare_ledger(home: Path) -> Path:
+    config = home / ".config/tagwerk/config.toml"
+    config.parent.mkdir(parents=True)
+    config.write_text("")
+    return home / ".local/share/tagwerk"
+
+
+@pytest.fixture
 def berlin() -> Iterator[None]:
     with pytest.MonkeyPatch.context() as patch:
         patch.setenv("TZ", "Europe/Berlin")
@@ -92,13 +101,14 @@ def stamp(moment: datetime) -> str:
     return moment.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def polls(
-    start: datetime, count: int, window_class: str = "vivaldi", title: str = "New Tab - Vivaldi", cwd: str | None = None
-) -> list[Event]:
-    return [
-        {"ts": stamp(start + i * MINUTE), "ev": "focus", "class": window_class, "title": title, "cwd": cwd}
-        for i in range(count)
-    ]
+def poll(
+    moment: datetime, window_class: str = "vivaldi", title: str | None = "New Tab - Vivaldi", cwd: str | None = None
+) -> Event:
+    return {"ts": stamp(moment), "ev": "focus", "class": window_class, "title": title, "cwd": cwd}
+
+
+def polls(start: datetime, count: int, **window: Any) -> list[Event]:
+    return [poll(start + i * MINUTE, **window) for i in range(count)]
 
 
 def mark(moment: datetime, ev: str) -> Event:
@@ -1707,13 +1717,17 @@ def doctor(capsys: pytest.CaptureFixture[str], code: int, *argv: str) -> list[st
     return lines(capsys, "doctor", *argv, code=code)
 
 
+def blocks(rows: list[str]) -> list[list[str]]:
+    return [list(group) for present, group in groupby(rows, bool) if present]
+
+
 def per_sensor(rows: list[str]) -> dict[str, list[str]]:
-    sensors = rows[: rows.index("")]
-    return {sensor: rest.split() for sensor, _, rest in (uncolored(row).partition("  ") for row in sensors)}
+    cells = (uncolored(row).partition("  ") for row in blocks(rows)[0])
+    return {sensor: rest.split() for sensor, _, rest in cells}
 
 
 def wiring(rows: list[str]) -> list[str]:
-    return rows[rows.index("") + 1 :]
+    return blocks(rows)[1]
 
 
 def per_piece(rows: list[str]) -> dict[str, str]:
@@ -1736,14 +1750,14 @@ def link_pi(home: Path, target: Path = CONTRIB / "pi/tagwerk.ts") -> None:
     path.symlink_to(target)
 
 
-def live(ledger: Path) -> None:
-    seed(ledger, mark(ago(minutes=2), "focus"), beat(ago(hours=3), "~/code/blog"), mark(ago(hours=5), "idle"))
+def live(bare_ledger: Path) -> None:
+    seed(bare_ledger, poll(ago(minutes=2)), beat(ago(hours=3), "~/code/blog"), mark(ago(hours=5), "idle"))
 
 
 def test_doctor_reports_one_live_row_per_sensor_with_its_local_time_and_age(
-    ledger: Path, berlin: None, capsys: pytest.CaptureFixture[str]
+    bare_ledger: Path, berlin: None, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    live(ledger)
+    live(bare_ledger)
     rows = per_sensor(doctor(capsys, 0))
     assert list(rows) == ["poll", "beat", "idle mark"]
     assert [cells[-1] for cells in rows.values()] == ["live", "live", "live"]
@@ -1751,23 +1765,23 @@ def test_doctor_reports_one_live_row_per_sensor_with_its_local_time_and_age(
     assert [cells[2:4] for cells in rows.values()] == [["2m", "ago"], ["3h", "ago"], ["5h", "ago"]]
 
 
-def test_doctor_calls_a_sensor_that_never_appended_dark(ledger: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    seed(ledger, mark(ago(minutes=2), "focus"), mark(ago(hours=2), "active"))
+def test_doctor_calls_a_sensor_that_never_appended_dark(bare_ledger: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    seed(bare_ledger, poll(ago(minutes=2)), mark(ago(hours=2), "active"))
     rows = per_sensor(doctor(capsys, 2))
     assert rows["beat"] == ["never", "-", "dark"]
     assert [cells[-1] for cells in rows.values()] == ["live", "dark", "live"]
 
 
 def test_doctor_calls_a_sensor_that_went_quiet_mid_ledger_dark(
-    ledger: Path, capsys: pytest.CaptureFixture[str]
+    bare_ledger: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    seed(ledger, mark(ago(days=9), "focus"), beat(ago(days=9), "~/code/blog"), mark(ago(days=9), "idle"))
-    seed(ledger, mark(ago(minutes=2), "focus"), mark(ago(hours=2), "idle"))
+    seed(bare_ledger, poll(ago(days=9)), beat(ago(days=9), "~/code/blog"), mark(ago(days=9), "idle"))
+    seed(bare_ledger, poll(ago(minutes=2)), mark(ago(hours=2), "idle"))
     assert per_sensor(doctor(capsys, 2))["beat"][2:] == ["9d", "ago", "dark"]
 
 
 def test_doctor_on_an_empty_ledger_reports_a_dark_poll_and_judges_nothing_else(
-    ledger: Path, capsys: pytest.CaptureFixture[str]
+    bare_ledger: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     rows = per_sensor(doctor(capsys, 2))
     assert [cells[-1] for cells in rows.values()] == ["dark", "unknown", "unknown"]
@@ -1775,22 +1789,22 @@ def test_doctor_on_an_empty_ledger_reports_a_dark_poll_and_judges_nothing_else(
 
 
 def test_doctor_judges_quiet_sensors_against_the_last_poll_not_the_wall_clock(
-    ledger: Path, capsys: pytest.CaptureFixture[str]
+    bare_ledger: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    seed(ledger, mark(ago(days=14), "focus"), beat(ago(days=14, minutes=5), "~/code/blog"), mark(ago(days=14), "idle"))
+    seed(bare_ledger, poll(ago(days=14)), beat(ago(days=14, minutes=5), "~/code/blog"), mark(ago(days=14), "idle"))
     rows = per_sensor(doctor(capsys, 2))
     assert [cells[-1] for cells in rows.values()] == ["dark", "live", "live"]
     assert {cells[2] for cells in rows.values()} == {"14d"}
 
 
 def test_doctor_paints_only_the_dark_row_red_and_drops_it_for_no_color(
-    ledger: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    bare_ledger: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     monkeypatch.setenv("FORCE_COLOR", "1")
-    seed(ledger, mark(ago(minutes=2), "focus"), mark(ago(hours=2), "idle"))
-    poll, beats, idle = doctor(capsys, 2)[:3]
-    assert (beats.startswith(tagwerk.RED), beats.endswith(tagwerk.RESET)) == (True, True)
-    assert "\033[" not in poll + idle
+    seed(bare_ledger, poll(ago(minutes=2)), mark(ago(hours=2), "idle"))
+    poll_row, beat_row, idle_row = doctor(capsys, 2)[:3]
+    assert (beat_row.startswith(tagwerk.RED), beat_row.endswith(tagwerk.RESET)) == (True, True)
+    assert "\033[" not in poll_row + idle_row
     monkeypatch.delenv("FORCE_COLOR")
     assert "\033[" not in "\n".join(doctor(capsys, 2, "--no-color"))
 
@@ -1800,12 +1814,12 @@ def test_doctor_takes_its_darkness_threshold_from_the_config(
 ) -> None:
     (home / "config.toml").write_text(f'data_dir = "{home}/data"\nsensor_dark_h = 1\n')
     monkeypatch.setenv("TAGWERK_CONFIG", str(home / "config.toml"))
-    seed(home / "data", mark(ago(minutes=2), "focus"), beat(ago(hours=3), "~/code/blog"), mark(ago(minutes=3), "idle"))
+    seed(home / "data", poll(ago(minutes=2)), beat(ago(hours=3), "~/code/blog"), mark(ago(minutes=3), "idle"))
     assert [cells[-1] for cells in per_sensor(doctor(capsys, 2)).values()] == ["live", "dark", "live"]
 
 
-def test_doctor_findings_go_to_stdout(ledger: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    seed(ledger, mark(ago(minutes=2), "focus"))
+def test_doctor_findings_go_to_stdout(bare_ledger: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    seed(bare_ledger, poll(ago(minutes=2)))
     assert tagwerk.main(["doctor"]) == 2
     captured = capsys.readouterr()
     assert captured.err == ""
@@ -1816,8 +1830,10 @@ WIRED = json.loads((CONTRIB / "claude-hooks.json").read_text())
 BARE = {"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "echo done"}]}]}}
 
 
-def test_doctor_reports_both_agent_hooks_wired(ledger: Path, home: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    live(ledger)
+def test_doctor_reports_both_agent_hooks_wired(
+    bare_ledger: Path, home: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    live(bare_ledger)
     claude_settings(home, WIRED)
     link_pi(home)
     rows = doctor(capsys, 0)
@@ -1826,9 +1842,9 @@ def test_doctor_reports_both_agent_hooks_wired(ledger: Path, home: Path, capsys:
 
 
 def test_doctor_names_the_claude_install_command_when_no_hook_runs_tagwerk_beat(
-    ledger: Path, home: Path, capsys: pytest.CaptureFixture[str]
+    bare_ledger: Path, home: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    live(ledger)
+    live(bare_ledger)
     claude_settings(home, BARE)
     link_pi(home)
     rows = doctor(capsys, 0)
@@ -1837,9 +1853,9 @@ def test_doctor_names_the_claude_install_command_when_no_hook_runs_tagwerk_beat(
 
 
 def test_doctor_names_the_pi_install_command_when_its_link_does_not_resolve(
-    ledger: Path, home: Path, capsys: pytest.CaptureFixture[str]
+    bare_ledger: Path, home: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    live(ledger)
+    live(bare_ledger)
     claude_settings(home, WIRED)
     link_pi(home, home / "gone/tagwerk.ts")
     rows = doctor(capsys, 0)
@@ -1848,9 +1864,9 @@ def test_doctor_names_the_pi_install_command_when_its_link_does_not_resolve(
 
 
 def test_doctor_names_both_install_commands_when_neither_piece_is_wired(
-    ledger: Path, home: Path, capsys: pytest.CaptureFixture[str]
+    bare_ledger: Path, home: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    live(ledger)
+    live(bare_ledger)
     claude_settings(home, {})
     rows = doctor(capsys, 0)
     assert per_piece(rows) == {"claude hooks": "missing", "pi extension": "missing"}
@@ -1858,9 +1874,9 @@ def test_doctor_names_both_install_commands_when_neither_piece_is_wired(
 
 
 def test_doctor_cannot_tell_when_the_claude_settings_file_is_absent(
-    ledger: Path, home: Path, capsys: pytest.CaptureFixture[str]
+    bare_ledger: Path, home: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    live(ledger)
+    live(bare_ledger)
     link_pi(home)
     rows = doctor(capsys, 0)
     assert per_piece(rows) == {"claude hooks": "unknown", "pi extension": "wired"}
@@ -1869,9 +1885,9 @@ def test_doctor_cannot_tell_when_the_claude_settings_file_is_absent(
 
 @pytest.mark.parametrize("settings", ['{"hooks": []}', "[]", '"hooks"', "{", ""])
 def test_doctor_cannot_tell_when_the_claude_settings_hold_unexpected_json(
-    ledger: Path, home: Path, settings: str, capsys: pytest.CaptureFixture[str]
+    bare_ledger: Path, home: Path, settings: str, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    live(ledger)
+    live(bare_ledger)
     claude_settings(home, settings)
     link_pi(home)
     rows = doctor(capsys, 0)
@@ -1880,9 +1896,109 @@ def test_doctor_cannot_tell_when_the_claude_settings_hold_unexpected_json(
 
 
 def test_doctor_keeps_its_exit_code_when_a_dark_sensor_meets_unwired_hooks(
-    ledger: Path, capsys: pytest.CaptureFixture[str]
+    bare_ledger: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    seed(ledger, mark(ago(minutes=2), "focus"), mark(ago(hours=2), "idle"))
+    seed(bare_ledger, poll(ago(minutes=2)), mark(ago(hours=2), "idle"))
     rows = doctor(capsys, 2)
     assert per_sensor(rows)["beat"] == ["never", "-", "dark"]
     assert per_piece(rows) == {"claude hooks": "unknown", "pi extension": "missing"}
+
+
+TYPO_ROOT = """[roots]
+"~/code/typo" = "work"
+"""
+
+ZOOM_TITLE = r"""[[title]]
+pattern = '(?i)zoom|meet\.google'
+kind = "work"
+project = "general"
+"""
+
+
+def configured_ledger(home: Path, monkeypatch: pytest.MonkeyPatch, config: str) -> Path:
+    path = home / "config.toml"
+    path.write_text(f'data_dir = "{home}/data"\n{config}')
+    monkeypatch.setenv("TAGWERK_CONFIG", str(path))
+    return home / "data"
+
+
+def live_with(home: Path, monkeypatch: pytest.MonkeyPatch, config: str, *events: Event) -> None:
+    data = configured_ledger(home, monkeypatch, config)
+    live(data)
+    seed(data, *events)
+
+
+def test_doctor_stays_silent_about_config_when_every_root_exists_and_every_pattern_matched(
+    home: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (home / "code/live").mkdir(parents=True)
+    config = '[roots]\n"~/code/live" = "work"\n' + ZOOM_TITLE
+    live_with(home, monkeypatch, config, poll(ago(minutes=3), title="Zoom Meeting"))
+    assert len(blocks(doctor(capsys, 0))) == 2
+
+
+@pytest.mark.parametrize("as_file", [False, True])
+def test_doctor_calls_a_root_that_is_no_directory_suspect_and_names_it_as_the_config_wrote_it(
+    home: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], as_file: bool
+) -> None:
+    (home / "code").mkdir()
+    if as_file:
+        (home / "code/typo").write_text("a file is no cwd either")
+    live_with(home, monkeypatch, TYPO_ROOT)
+    (row,) = blocks(doctor(capsys, 3))[2]
+    assert row.startswith("root '~/code/typo'")
+    assert row.endswith("suspect")
+    assert "personal/other" in row
+
+
+def test_doctor_calls_a_title_pattern_that_matched_no_ledger_title_suspect(
+    home: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    live_with(home, monkeypatch, ZOOM_TITLE)
+    (row,) = blocks(doctor(capsys, 3))[2]
+    assert row.startswith(r"title '(?i)zoom|meet\.google'")
+    assert row.endswith("suspect")
+    assert "never ran" in row
+
+
+def test_doctor_clears_a_title_pattern_that_matched_any_title_in_the_whole_ledger(
+    home: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    live_with(home, monkeypatch, ZOOM_TITLE, poll(ago(days=40), title="Zoom Meeting"))
+    assert len(blocks(doctor(capsys, 0))) == 2
+
+
+def test_doctor_reports_a_dark_sensor_over_suspect_config(
+    home: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    seed(configured_ledger(home, monkeypatch, TYPO_ROOT), poll(ago(minutes=2)))
+    rows = doctor(capsys, 2)
+    assert [cells[-1] for cells in per_sensor(rows).values()] == ["live", "dark", "dark"]
+    assert blocks(rows)[2][0].endswith("suspect")
+
+
+def test_doctor_leaves_a_suspect_row_unpainted_because_the_config_may_be_deliberate(
+    home: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("FORCE_COLOR", "1")
+    live_with(home, monkeypatch, TYPO_ROOT)
+    assert "\033[" not in blocks(doctor(capsys, 3))[2][0]
+
+
+def test_doctor_skips_a_focus_event_that_carries_no_title_instead_of_dying_on_it(
+    home: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    untitled: Event = {"ts": stamp(ago(minutes=5)), "ev": "focus", "class": "x", "cwd": None}
+    live_with(home, monkeypatch, ZOOM_TITLE, poll(ago(minutes=4), title=None), untitled)
+    assert blocks(doctor(capsys, 3))[2][0].startswith(r"title '(?i)zoom|meet\.google'")
+
+
+def test_doctor_reads_every_entry_of_an_unedited_config_template_as_suspect(
+    ledger: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    live(ledger)
+    rows = blocks(doctor(capsys, 3))[2]
+    assert len(rows) == 5
+    assert all(row.endswith("suspect") for row in rows)
+    assert rows[0].startswith("root '~/code/work-org'")
+    assert rows[3].startswith(r"title 'work-org/(?P<project>[\w.-]+)'")

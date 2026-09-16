@@ -9,7 +9,7 @@ import sys
 import tomllib
 import zlib
 from collections import defaultdict
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 from itertools import groupby
@@ -41,6 +41,8 @@ PALETTE = (166, 36, 176, 61, 142)
 
 
 CATCH_ALLS = ("general", "other")
+ROOT_GONE = "no such directory; its minutes book to a shorter root or personal/other"
+TITLE_UNMATCHED = "no ledger title matched; either the app never ran or it books elsewhere"
 SENSORS = (("poll", ("focus",)), ("beat", ("beat",)), ("idle mark", ("idle", "active")))
 CLAUDE_HOOKS_INSTALL = r"""jq -s '.[1].hooks as $add | .[0] | .hooks = reduce ($add | keys[]) as $k (.hooks // {}; .[$k] = ((.[$k] // []) + $add[$k] | unique))' \
   ~/.claude/settings.json /usr/share/tagwerk/claude-hooks.json > ~/.claude/settings.json.new \
@@ -57,6 +59,12 @@ class Bucket(NamedTuple):
     @property
     def is_repo(self) -> bool:
         return self.project not in CATCH_ALLS
+
+
+class Root(NamedTuple):
+    path: Path
+    kind: str
+    as_written: str
 
 
 class Finding(NamedTuple):
@@ -87,7 +95,7 @@ class Config:
     beat_lease: timedelta
     beat_throttle: timedelta
     focus_lease: timedelta
-    roots: list[tuple[Path, str]]
+    roots: list[Root]
     titles: list[TitleRule]
     renames: dict[str, str]
     poll_sec: float
@@ -159,8 +167,8 @@ def load_config(path: Path, data_dir: Path | None) -> Config:
                 "book off time with tagwerk fix --kind off"
             )
     chosen = data_dir or os.environ.get("TAGWERK_DATA_DIR") or raw.get("data_dir") or default_data_dir()
-    roots = [(Path(root).expanduser(), kind) for root, kind in raw.get("roots", {}).items()]
-    roots.sort(key=lambda root: len(root[0].parts), reverse=True)
+    roots = [Root(Path(root).expanduser(), kind, root) for root, kind in raw.get("roots", {}).items()]
+    roots.sort(key=lambda root: len(root.path.parts), reverse=True)
     renames = raw.get("rename", {})
     for old, new in renames.items():
         if old in CATCH_ALLS or new in CATCH_ALLS:
@@ -197,11 +205,11 @@ def resolve_cwd(config: Config, cwd: str | None) -> Bucket | None:
     if cwd is None:
         return None
     path = Path(cwd)
-    for root, kind in config.roots:
-        if path.is_relative_to(root):
-            below = path.relative_to(root).parts
+    for root in config.roots:
+        if path.is_relative_to(root.path):
+            below = path.relative_to(root.path).parts
             # ponytail: the project ends at the first dot, so assets.8467 is assets; a dotted repo name needs its own root
-            return fold(config, Bucket(kind, below[0].split(".")[0] if below else "general"))
+            return fold(config, Bucket(root.kind, below[0].split(".")[0] if below else "general"))
     return None
 
 
@@ -609,9 +617,7 @@ def format_age(age: timedelta) -> str:
     return f"{minutes // (24 * 60)}d"
 
 
-def last_seen(data_dir: Path) -> dict[str, datetime]:
-    # ponytail: scans every month file for a handful of last events, like import-timew; read newest-first if it drags
-    events = read_events(data_dir, EPOCH, datetime.now(UTC))
+def last_seen(events: list[Event]) -> dict[str, datetime]:
     return {event["ev"]: datetime.fromisoformat(event["ts"]) for event in events}
 
 
@@ -637,20 +643,37 @@ def check_pi_extension() -> tuple[str, str]:
     return ("wired", "") if Path(PI_LINK).expanduser().exists() else ("missing", PI_INSTALL)
 
 
-def cmd_doctor(config: Config) -> int:
-    seen = last_seen(config.data_dir)
-    now = datetime.now(UTC)
-    findings = []
+def sensor_rows(config: Config, seen: dict[str, datetime], now: datetime) -> list[Finding]:
+    rows = []
     for sensor, marks in SENSORS:
         last = max((seen[mark] for mark in marks if mark in seen), default=None)
         # ponytail: the poller is the reference, so it alone measures against now; the rest need a poll to be judged
         against = now if "focus" in marks else seen.get("focus")
         when = f"{last.astimezone():%Y-%m-%d %H:%M}" if last else "never"
         age = f"{format_age(now - last)} ago" if last else "-"
-        findings.append(Finding(sensor, when, age, verdict(last, against, config.sensor_dark)))
-    widths = [max(len(cell) for cell in column) for column in zip(*findings, strict=True)]
-    for row in findings:
-        line = f"{row.sensor:<{widths[0]}}  {row.when:<{widths[1]}}  {row.age:<{widths[2]}}  {row.verdict}"
+        rows.append(Finding(sensor, when, age, verdict(last, against, config.sensor_dark)))
+    return rows
+
+
+def suspect_rows(config: Config, titles: set[str]) -> list[tuple[str, str, str]]:
+    # ponytail: is_dir sees an unmounted drive as a typo; advisory only, so it costs a row and exit 3, never a number
+    rows = [(f"root '{root.as_written}'", ROOT_GONE, "suspect") for root in config.roots if not root.path.is_dir()]
+    unmatched = [pattern for pattern, _, _ in config.titles if not any(pattern.search(title) for title in titles)]
+    return rows + [(f"title '{pattern.pattern}'", TITLE_UNMATCHED, "suspect") for pattern in unmatched]
+
+
+def render_rows(rows: Sequence[tuple[str, ...]]) -> list[str]:
+    widths = [max(len(cell) for cell in column) for column in zip(*rows, strict=True)]
+    padded = ("  ".join(cell.ljust(width) for cell, width in zip(row, widths, strict=True)) for row in rows)
+    return [line.rstrip() for line in padded]
+
+
+def cmd_doctor(config: Config) -> int:
+    now = datetime.now(UTC)
+    # ponytail: scans every month file for the last event per sensor and every title, like import-timew
+    events = read_events(config.data_dir, EPOCH, now)
+    sensors = sensor_rows(config, last_seen(events), now)
+    for row, line in zip(sensors, render_rows(sensors), strict=True):
         print(paint(line, RED) if row.verdict == "dark" else line)
     pieces = [Wiring("claude hooks", *check_claude_hooks()), Wiring("pi extension", *check_pi_extension())]
     width = max(len(piece.name) for piece in pieces)
@@ -659,7 +682,14 @@ def cmd_doctor(config: Config) -> int:
         print(f"{piece.name:<{width}}  {piece.verdict}")
         for note in piece.note.splitlines():
             print(f"  {note}")
-    return 2 if any(row.verdict == "dark" for row in findings) else 0
+    # a focus event may carry no title, as resolve_title's signature already allows; it then matched no pattern
+    titles = {event["title"] for event in events if event["ev"] == "focus" and event.get("title")}
+    suspect = suspect_rows(config, titles)
+    if suspect:
+        print("\n" + "\n".join(render_rows(suspect)))
+    if any(row.verdict == "dark" for row in sensors):
+        return 2
+    return 3 if suspect else 0
 
 
 def main(argv: list[str]) -> int:
@@ -728,8 +758,12 @@ def main(argv: list[str]) -> int:
     commands.add_parser(
         "doctor",
         parents=[plain],
-        help="one row per sensor with its last event and verdict, then the agent hook wiring; "
-        "exits 2 when any sensor is dark",
+        help="one row per sensor with its last event and verdict, then the agent hook wiring, "
+        "then any suspect config; exits 2 on a dark sensor, 3 on suspect config alone",
+        description="One row per sensor with its last event and verdict, then the agent hook wiring, then any "
+        "root or title pattern that cannot be doing anything. Exit codes: 0 every sensor live and no suspect "
+        "config, 1 tagwerk itself failed, 2 at least one sensor dark whatever the config says, 3 every sensor "
+        "live but the config suspect. An argparse usage error also exits 2.",
     )
     commands.add_parser("idle", help="mark the start of idle, from the hypridle listener or before sleep")
     commands.add_parser("active", help="mark the end of idle, from the hypridle listener or after sleep")
