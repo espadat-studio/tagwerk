@@ -10,7 +10,7 @@ import qs.Ui
 // already computed (ADR-0011), so no threshold is re-implemented here.
 BarWidget {
   id: root
-  moduleName: "sripwoud.tagwerk"
+  moduleName: "espadat.tagwerk"
 
   // The track reaches past the cap, so closing on it is a position to watch
   // rather than a threshold that trips. 1.25 puts the cap notch at 80% of

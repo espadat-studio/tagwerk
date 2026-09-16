@@ -100,9 +100,9 @@ A dark row names what to fix. A dark `poll` is the focus poller: check `systemct
 A cap-proximity cue for the bar, answering one question: am I close to the day cap, or not? A track, a fill running to today's credited minutes with the paid stretch solid inside it, and the cap as a notch you watch the fill close on. One glance, no arithmetic, nothing to read.
 
 ```sh
-cp -r /usr/share/tagwerk/omarchy ~/.config/omarchy/plugins/sripwoud.tagwerk
+cp -r /usr/share/tagwerk/omarchy ~/.config/omarchy/plugins/espadat.tagwerk
 omarchy-shell shell rescanPlugins
-omarchy plugin enable sripwoud.tagwerk
+omarchy plugin enable espadat.tagwerk
 ```
 
 | What you see                                                                                                                                                                                                                                      | What it is                                                                                                                                                                                                                                          |
@@ -113,7 +113,7 @@ omarchy plugin enable sripwoud.tagwerk
 | <picture><source media="(prefers-color-scheme: dark)" srcset=".github/assets/widget-atcap-dark.png"><img alt="the fill reaching the notch, which still cuts through it" src=".github/assets/widget-atcap-light.png" width="192"></picture>        | 8:00 credited, exactly on the cap. The fill stops flush against the notch, because the cap sits at 80% of a track that runs to 125% of it.                                                                                                          |
 | <picture><source media="(prefers-color-scheme: dark)" srcset=".github/assets/widget-over-dark.png"><img alt="a red fill running past the notch" src=".github/assets/widget-over-light.png" width="192"></picture>                                 | 9:00 credited, `over_cap`. Both segments switch to the theme's urgent colour and the notch does not, so the hour past the cap stays readable: the notch is painted above the fill. There is no approaching colour — proximity is the fill's length. |
 
-Hover prints work, personal, presence, and the time left or over. Click opens `tagwerk week` in the themed floating terminal. The widget lands on the right of the bar; `omarchy bar move sripwoud.tagwerk` relocates it.
+Hover prints work, personal, presence, and the time left or over. Click opens `tagwerk week` in the themed floating terminal. The widget lands on the right of the bar; `omarchy bar move espadat.tagwerk` relocates it.
 
 It runs `tagwerk day --json` every 300 s and draws four rectangles. Nothing else: it never reads the ledger, never reads your config, and never re-implements the cap rule — `over_cap` arrives already computed (ADR-0011). Change `refreshIntervalSec` in the widget's settings; below 15 minutes the fill moves less than a pixel, so the interval buys the notch crossing and nothing more.
 
