@@ -23,4 +23,4 @@ run = ["uv run pytest -q", "uv run mypy --strict tagwerk.py"]
 hk = "1.58.1"
 node = "24.21.0"
 python = "3.14.7"
-ruff = "0.16.7"
+ruff = "0.16.8"
