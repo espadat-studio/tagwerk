@@ -27,7 +27,7 @@ systemctl --user enable --now tagwerk-idle.service tagwerk-focus.service
 
 Any AUR helper works: `yay -S tagwerk-git`. Without one, `git clone https://aur.archlinux.org/tagwerk-git.git && cd tagwerk-git && makepkg -si` builds the package and installs it through pacman.
 
-In the config, point `[roots]` at your work org's clone directory as `work` and at your personal code directory as `personal`. A fixed-price customer's directory is `fixed`: paid, so it counts toward the caps, but never on the hourly customer's invoice. Make the `[[title]]` patterns match your org's GitHub titles and chat apps. The longest root wins. The project is the first directory below the root, cut at its first dot, so `assets.8467` and `assets` are one project. Every other key ships with its default; the comments in the file `tagwerk init` writes explain each one.
+In the config, point `[roots]` at your work org's clone directory as `work` and at your personal code directory as `personal`. A fixed-price customer's directory is `fixed`: paid, so it counts toward the caps, but never on the hourly customer's invoice. Make the `[[title]]` patterns match your org's GitHub titles and chat apps. A rule that cannot work is rejected when the config loads, named by its position and its pattern: no `pattern`, no `kind`, a `pattern` that is no regex, or nothing to name the project with. The longest root wins. The project is the first directory below the root, cut at its first dot, so `assets.8467` and `assets` are one project. Every other key ships with its default; the comments in the file `tagwerk init` writes explain each one.
 
 | kind       | counts toward the caps | on the invoice |
 | ---------- | :--------------------: | :------------: |

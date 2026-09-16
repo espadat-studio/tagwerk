@@ -155,17 +155,46 @@ def config_path(override: Path | None) -> Path:
     return (override or Path(os.environ.get("TAGWERK_CONFIG") or default_config_path())).expanduser()
 
 
+def check_kind(path: Path, offender: str, kind: Any) -> None:
+    if kind not in RULE_KINDS:
+        raise SystemExit(
+            f"{path}: {offender}: kind must be one of {', '.join(RULE_KINDS)}; book off time with tagwerk fix --kind off"
+        )
+
+
+def load_titles(path: Path, raw: Any) -> list[TitleRule]:
+    if not isinstance(raw, list):
+        raise SystemExit(f"{path}: [title] is one table, not a rule; every title rule is its own [[title]]")
+    titles = []
+    for position, rule in enumerate(raw, 1):
+        at = f"{path}: title rule {position}"
+        if not isinstance(rule, dict) or not isinstance(rule.get("pattern"), str):
+            raise SystemExit(f"{at}: no pattern; a rule needs pattern = '...' to match a window title against")
+        at = f"{at} {rule['pattern']!r}"
+        if "kind" not in rule:
+            raise SystemExit(f"{at}: no kind; give it one of {', '.join(RULE_KINDS)}")
+        check_kind(path, rule["pattern"], rule["kind"])
+        try:
+            pattern = re.compile(rule["pattern"])
+        except re.PatternError as err:
+            raise SystemExit(
+                f"{at}: {err}; the pattern is a Python regex, so escape any literal metacharacter"
+            ) from err
+        if not rule.get("project") and "project" not in pattern.groupindex:
+            raise SystemExit(
+                f'{at}: nothing names the project; add a (?P<project>...) group to the pattern, or project = "general"'
+            )
+        titles.append((pattern, rule["kind"], rule.get("project")))
+    return titles
+
+
 def load_config(path: Path, data_dir: Path | None) -> Config:
     if not path.is_file():
         raise SystemExit(f"config file not found: {path}; run tagwerk init")
     raw = tomllib.loads(path.read_text())
-    rules = [*raw.get("roots", {}).items(), *((rule["pattern"], rule["kind"]) for rule in raw.get("title", []))]
-    for rule, kind in rules:
-        if kind not in RULE_KINDS:
-            raise SystemExit(
-                f"{path}: {rule}: kind must be one of {', '.join(RULE_KINDS)}; "
-                "book off time with tagwerk fix --kind off"
-            )
+    for root, kind in raw.get("roots", {}).items():
+        check_kind(path, root, kind)
+    titles = load_titles(path, raw.get("title", []))
     chosen = data_dir or os.environ.get("TAGWERK_DATA_DIR") or raw.get("data_dir") or default_data_dir()
     roots = [Root(Path(root).expanduser(), kind, root) for root, kind in raw.get("roots", {}).items()]
     roots.sort(key=lambda root: len(root.path.parts), reverse=True)
@@ -189,7 +218,7 @@ def load_config(path: Path, data_dir: Path | None) -> Config:
         beat_throttle=timedelta(seconds=raw.get("beat_throttle_sec", 60)),
         focus_lease=timedelta(minutes=raw.get("focus_lease_min", 1)),
         roots=roots,
-        titles=[(re.compile(rule["pattern"]), rule["kind"], rule.get("project")) for rule in raw.get("title", [])],
+        titles=titles,
         renames=renames,
         kitty_socket=raw.get("kitty_socket", "unix:${XDG_RUNTIME_DIR}/omarchy-kitty-{pid}"),
         day_cap_h=raw.get("day_cap_h", 8),
