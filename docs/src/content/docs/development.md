@@ -16,7 +16,7 @@ mise run test
 
 Tests drive the CLI with `TAGWERK_CONFIG` and `TAGWERK_DATA_DIR` pointed at a temp directory, and with fake `hyprctl` and `kitten` executables on `PATH`. They never touch the real ledger.
 
-That matters when working on tagwerk with an agent: a manual `tagwerk` run with no environment set appends to your actual ledger, so point both variables somewhere disposable first.
+Set both variables before running the CLI by hand too. A bare `tagwerk beat` or `tagwerk fix` appends to your real ledger, and nothing in the ledger is ever edited.
 
 ## Packaging
 

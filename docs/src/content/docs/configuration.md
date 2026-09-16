@@ -51,13 +51,13 @@ Point `work` at your work org's clone directory and `personal` at your own code.
 
 The day cap asks a different question and no kind answers it: it counts every credited minute, `personal` included (ADR-0011).
 
-A kind never names the payer. It says whether minutes are paid and whether they are invoiced, nothing else — two customers under the same kind are two projects, not two kinds.
+A kind never names the payer. It says whether minutes are paid and whether they are invoiced, nothing else: two customers under the same kind are two projects, not two kinds.
 
 `off` belongs to a span, not to a root or a title rule. The config rejects it in either place; `tagwerk fix --kind off` books it.
 
 ## `[[title]]`
 
-Title rules are consulted only when the cwd resolves to nothing — a browser, a chat app, a meeting. The first matching rule wins.
+Title rules are consulted only when the cwd resolves to nothing: a browser, a chat app, a meeting. The first matching rule wins.
 
 ```toml
 [[title]] # a GitHub title names the repo it is on
@@ -89,15 +89,15 @@ The kind is never rewritten, so minutes credited as `personal` stay personal eve
 
 A config that cannot work is rejected when it loads, not silently ignored. Every message names the offending rule by its position and its pattern, or the offending root or rename by its key.
 
-| Rejected                                           | Message says                                                 |
-| -------------------------------------------------- | ------------------------------------------------------------ |
-| a `[[title]]` rule with no `pattern`               | a rule needs `pattern = '...'` to match a title against      |
-| a `[[title]]` rule with no `kind`                  | give it one of `work`, `fixed`, `personal`                   |
-| a `pattern` that is no regex                       | the regex error, and to escape any literal metacharacter     |
-| nothing to name the project with                   | add a `(?P<project>...)` group, or `project = "general"`     |
-| `kind = "off"` on a root or a rule                 | book off time with `tagwerk fix --kind off` instead          |
-| `[title]` as one table                             | every title rule is its own `[[title]]`                      |
-| a rename touching `general` or `other`             | those are catch-alls, not repos; only a repo can be renamed  |
-| a rename pointing at a name that is itself renamed | point every old name at the current one; a rename is one hop |
+| Rejected                                           | Message says                                                                  |
+| -------------------------------------------------- | ----------------------------------------------------------------------------- |
+| a `[[title]]` rule with no `pattern`               | a rule needs `pattern = '...'` to match a title against                       |
+| a `[[title]]` rule with no `kind`                  | give it one of `work`, `fixed`, `personal`                                    |
+| a `pattern` that is no regex                       | the regex error, and to escape any literal metacharacter                      |
+| nothing to name the project with                   | add a `(?P<project>...)` group, or `project = "general"`                      |
+| a kind outside `work`, `fixed` or `personal`       | names the three that are allowed; book off time with `tagwerk fix --kind off` |
+| `[title]` as one table                             | every title rule is its own `[[title]]`                                       |
+| a rename touching `general` or `other`             | those are catch-alls, not repos; only a repo can be renamed                   |
+| a rename pointing at a name that is itself renamed | point every old name at the current one; a rename is one hop                  |
 
 A config that loads and still does nothing is a different problem: `tagwerk doctor` reports a root that is no directory and a `[[title]]` pattern that has never matched as `suspect`. See [Verification](/getting-started/verification/).

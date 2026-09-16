@@ -4,7 +4,7 @@
 
 > Passive work-hours ledger for one Linux desktop
 
-Zero manual start or stop: the timewarrior setup tagwerk replaces died of manual discipline. Sensors append events, attribution credits every present minute to a project, and reports answer two questions and no others — what goes on this month's invoice, and whether last week was too long a week.
+No manual start or stop. The timewarrior setup tagwerk replaces died of manual discipline. Sensors append events, attribution credits every present minute to a project, and reports answer two questions and no others: what goes on this month's invoice, and whether last week was too long a week.
 
 | Piece        | What it does                                                                                         |
 | ------------ | ---------------------------------------------------------------------------------------------------- |
@@ -30,16 +30,16 @@ The Claude Code hooks and the pi extension are part of that install, not an opti
 
 Full documentation lives at [tagwerk.espadat.com](https://tagwerk.espadat.com):
 
-- [Installation](https://tagwerk.espadat.com/getting-started/installation/) — the AUR package, the units and the hypridle choice
-- [Agent hooks](https://tagwerk.espadat.com/getting-started/agent-hooks/) — wiring Claude Code and pi
-- [Verification](https://tagwerk.espadat.com/getting-started/verification/) — proving each sensor reaches the ledger
-- [Concepts](https://tagwerk.espadat.com/concepts/) — presence, leases, the even split and the catch-alls
-- [Configuration](https://tagwerk.espadat.com/configuration/) — every key with its default
-- [CLI reference](https://tagwerk.espadat.com/cli-reference/) — every command with its flags
-- [Bar widget](https://tagwerk.espadat.com/bar-widget/) — the Omarchy plugin, with what each state looks like
-- [Troubleshooting](https://tagwerk.espadat.com/troubleshooting/) — the known ceilings
-- [Migration](https://tagwerk.espadat.com/migration/) — arriving from timewarrior
-- [Development](https://tagwerk.espadat.com/development/) — the local loop and packaging
+- [Installation](https://tagwerk.espadat.com/getting-started/installation/) - the AUR package, the units and the hypridle choice
+- [Agent hooks](https://tagwerk.espadat.com/getting-started/agent-hooks/) - wiring Claude Code and pi
+- [Verification](https://tagwerk.espadat.com/getting-started/verification/) - proving each sensor reaches the ledger
+- [Concepts](https://tagwerk.espadat.com/concepts/) - presence, leases, the even split and the catch-alls
+- [Configuration](https://tagwerk.espadat.com/configuration/) - every key with its default
+- [CLI reference](https://tagwerk.espadat.com/cli-reference/) - every command with its flags
+- [Bar widget](https://tagwerk.espadat.com/bar-widget/) - the Omarchy plugin, with what each state looks like
+- [Troubleshooting](https://tagwerk.espadat.com/troubleshooting/) - the known ceilings
+- [Migration](https://tagwerk.espadat.com/migration/) - arriving from timewarrior
+- [Development](https://tagwerk.espadat.com/development/) - the local loop and packaging
 
 ## Requirements
 
@@ -47,7 +47,7 @@ Omarchy 4 with Hyprland and kitty. The AUR package pulls `hypridle` and the syst
 
 ## This repo
 
-- [CONTEXT.md](./CONTEXT.md) — the vocabulary every page and commit uses
-- [meta/adr/](./meta/adr/) — the decisions with their trade-offs
-- [issue #4](https://github.com/espadat-studio/tagwerk/issues/4) — the spec and its tickets
+- [CONTEXT.md](./CONTEXT.md) - the vocabulary every page and commit uses
+- [meta/adr/](./meta/adr/) - the decisions with their trade-offs
+- [issue #4](https://github.com/espadat-studio/tagwerk/issues/4) - the spec and its tickets
 - [Report issues](https://github.com/espadat-studio/tagwerk/issues)

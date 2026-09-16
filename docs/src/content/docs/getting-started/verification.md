@@ -12,7 +12,7 @@ tagwerk day
 
 ## What a working sensor looks like
 
-`doctor` prints one row per sensor — `poll`, `beat` and `idle mark` — with when it last appended and a verdict. Three `live` rows mean the focus poller, the agent hooks and the idle listener all reach the ledger, and `day` lists the repo you were in.
+`doctor` prints one row per sensor (`poll`, `beat` and `idle mark`) with when it last appended and a verdict. Three `live` rows mean the focus poller, the agent hooks and the idle listener all reach the ledger, and `day` lists the repo you were in.
 
 A row reads `unknown` when no poll proves the machine was ever on, so there is nothing to measure that sensor's silence against. A row reads `dark` when a sensor has appended nothing while the machine was demonstrably on, for longer than `sensor_dark_h`.
 
@@ -22,7 +22,7 @@ Below the sensors, `doctor` reports the two [agent hook](/getting-started/agent-
 
 ## Suspect config
 
-Last, `doctor` lists config that cannot be doing anything: a root that is no directory on disk, and a `[[title]]` pattern that no title in the ledger ever matched. Both read `suspect`, never dark — a root may sit on an unmounted drive, and a pattern may simply describe an app you have not opened. Each row names the path or pattern as your config wrote it, so you can grep for the line, and says where the minutes go instead.
+Last, `doctor` lists config that cannot be doing anything: a root that is no directory on disk, and a `[[title]]` pattern that no title in the ledger ever matched. Both read `suspect`, never dark: a root may sit on an unmounted drive, and a pattern may simply describe an app you have not opened. Each row names the path or pattern as your config wrote it, so you can grep for the line, and says where the minutes go instead.
 
 A config straight from `tagwerk init` reads suspect in every root and pattern until you edit it, because the template names an org that is not yours. That is the check working, not a fault, and it is why `tagwerk init && $EDITOR ~/.config/tagwerk/config.toml` is one command in the install.
 
@@ -37,14 +37,14 @@ They let a shell prompt or a timer alarm on wiring without a suspect pattern lig
 |    2 | at least one sensor dark, whatever the config says |
 |    3 | every sensor live, but the config is suspect       |
 
-Exit 2 is shared with argparse, which spends it on a usage error, so `tagwerk doctor --bogus` alarms a prompt exactly as a dark sensor does.
+Exit 2 is shared with argparse usage errors, one of the [known ceilings](/troubleshooting/).
 
 ## Fixing a dark row
 
 A dark row names what to fix.
 
-- **`poll`** is the focus poller: check `systemctl --user status tagwerk-focus.service` and `journalctl --user -u tagwerk-focus.service`; systemd restarts it after 5 s.
-- **`idle mark`** is `tagwerk-idle.service`, or hypridle running your own config without the `tagwerk idle` and `tagwerk active` lines.
-- **`beat`** means the [agent hooks](/getting-started/agent-hooks/) never landed, or every turn ran outside your `[roots]`: `tagwerk beat` drops a cwd it cannot resolve and exits 0, so nothing else reports it. The wiring rows tell the two apart — a `missing` row is the install you still owe, two `wired` rows point at `[roots]`.
+- `poll` is the focus poller: check `systemctl --user status tagwerk-focus.service` and `journalctl --user -u tagwerk-focus.service`; systemd restarts it after 5 s.
+- `idle mark` is `tagwerk-idle.service`, or hypridle running your own config without the `tagwerk idle` and `tagwerk active` lines.
+- `beat` means the [agent hooks](/getting-started/agent-hooks/) never landed, or every turn ran outside your `[roots]`: `tagwerk beat` drops a cwd it cannot resolve and exits 0, so nothing else reports it. The wiring rows tell the two apart: a `missing` row is the install you still owe, two `wired` rows point at `[roots]`.
 
-A machine that deliberately runs no agents reports `beat` dark for good; [Troubleshooting](/troubleshooting/) covers that and the other known ceilings.
+A sensor you deliberately never wired is a known ceiling rather than a fault. [Troubleshooting](/troubleshooting/) has that one and the rest.

@@ -17,7 +17,7 @@ It answers two questions and no others — what goes on this month's invoice, an
 | Ledger       | `~/.local/share/tagwerk/YYYY-MM.jsonl`, append-only, UTC timestamps               |
 | Reports      | `day`, `week`, `month`, `invoice`; `fix` appends a span                           |
 
-Nothing in the ledger is ever edited. A correction is a new span appended after the fact, and the latest one wins.
+Nothing in the ledger is ever edited. A fix is a new span appended after the fact, and the latest one wins.
 
 ## How a minute is credited
 

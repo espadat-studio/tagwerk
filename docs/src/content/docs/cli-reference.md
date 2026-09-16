@@ -21,9 +21,21 @@ These go before the subcommand.
 
 `init` rejects `--data-dir`: it writes a config, and that config is where `data_dir` belongs.
 
-Reports also take `--no-color`. Reports colour only when both stdout and stderr are terminals; `--no-color`, `NO_COLOR` and `TERM=dumb` each turn it off, and `FORCE_COLOR` overrides all three.
+### `--no-color`
+
+`--no-color` is not global. It belongs to the commands that print colour, and it goes after the subcommand: `tagwerk day --no-color` works, `tagwerk --no-color day` is a usage error. The commands that take it are `day`, `week`, `month`, `invoice` and `doctor`.
+
+Output colours only when both stdout and stderr are terminals. `--no-color`, `NO_COLOR` and `TERM=dumb` each turn it off, and `FORCE_COLOR` overrides all three.
 
 ## Reports
+
+```sh
+tagwerk week --ago 1
+tagwerk invoice 2026-08
+tagwerk --config ~/side-gig/tagwerk.toml invoice 2026-08
+```
+
+The last one bills a second gig from its own config and its own ledger.
 
 ### `tagwerk day [YYYY-MM-DD] [--ago N] [--json]`
 
@@ -99,6 +111,6 @@ Write the commented config template to `~/.config/tagwerk/config.toml`. It refus
 
 ### `tagwerk doctor`
 
-One row per sensor — `poll`, `beat`, `idle mark` — with its last event and a `live`, `dark` or `unknown` verdict. Then whether each agent hook is `wired`. Then any `suspect` root or title pattern.
+One row per sensor (`poll`, `beat`, `idle mark`) with its last event and a `live`, `dark` or `unknown` verdict. Then whether each agent hook is `wired`. Then any `suspect` root or title pattern.
 
 Exits 2 on a dark sensor and 3 on suspect config alone. [Verification](/getting-started/verification/) reads the whole output.

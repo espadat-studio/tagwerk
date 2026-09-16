@@ -15,7 +15,7 @@ Idle inhibitors are honoured, so a video call with your hands off the keyboard s
 
 ## Leases and the even split
 
-A repo signal grants that repo a **lease** — a period during which it is eligible for credit.
+A repo signal grants that repo a **lease**: a period during which it is eligible for credit.
 
 | Signal                       | Leases for        |
 | ---------------------------- | ----------------- |
@@ -31,7 +31,7 @@ Beats while idle book nothing, so an unattended overnight agent adds no hours. C
 
 ## The ambient bucket
 
-With no repo holding a lease, the focused window decides, and what it implies is the **ambient bucket**. It is credited only when no repo holds a lease — a repo signal always wins over the window in front of you.
+With no repo holding a lease, the focused window decides, and what it implies is the **ambient bucket**. It is credited only when no repo holds a lease, because a repo signal always wins over the window in front of you.
 
 - A kitty shell sitting at a root books that kind's `general`.
 - A title matching a `[[title]]` rule books what that rule says, so Slack, Zoom, Meet or your org's GitHub books `work/general`.
@@ -55,6 +55,6 @@ A kind never names the payer. Two customers billed differently are two projects 
 
 ## Spans win, renames fold
 
-A span overrides the sensors for its whole range — no partial merge — and the latest appended span wins on overlap. An `off` span removes its range from every report.
+A span overrides the sensors for its whole range, with no partial merge, and the latest appended span wins on overlap. An `off` span removes its range from every report.
 
-A rename folds a retired project name into its current one at resolution, for all time, past months included. The kind is never rewritten, so minutes credited as `personal` stay personal even if the project now sits under a work root (ADR-0010).
+A rename folds a retired project name into its current one at resolution, so a repo you renamed keeps one row in every report, past months included. It never touches the kind: minutes credited while the repo sat under a personal root stay personal (ADR-0010). [Configuration](/configuration/) has the syntax.

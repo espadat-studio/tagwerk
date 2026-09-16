@@ -11,7 +11,7 @@ tagwerk import-timew --work-tag TAG
 
 `TAG` is the timewarrior tag that marked an interval as work; `timew tags` lists them. Intervals without it become `personal`. A `project:<repo>` tag becomes the project, anything else lands in `general`.
 
-The import reads `timew export` and refuses to run twice, so run it before uninstalling timew. Every interval arrives as a span, which is exactly what a hand-entered correction is, so imported history and `tagwerk fix` behave identically from then on.
+The import reads `timew export` and refuses to run twice, so run it before uninstalling timew. Every interval arrives as a span, the same thing `tagwerk fix` appends, so imported history and hand-entered time behave identically from then on.
 
 ## Retiring the old setup
 
