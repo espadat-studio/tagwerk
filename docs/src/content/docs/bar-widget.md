@@ -5,11 +5,20 @@ description: "The Omarchy bar plugin: today's credited hours against the day cap
 
 A cap-proximity cue for the bar, answering one question: am I close to the day cap, or not? A track, a fill running to today's credited minutes with the paid stretch solid inside it, and the cap as a notch you watch the fill close on. One glance, no arithmetic, nothing to read.
 
+The widget lives in its own repo, [espadat-studio/omarchy-tagwerk](https://github.com/espadat-studio/omarchy-tagwerk), and installs as an Omarchy plugin:
+
 ```sh
-cp -r /usr/share/tagwerk/omarchy ~/.config/omarchy/plugins/espadat.tagwerk
-omarchy-shell shell rescanPlugins
-omarchy plugin enable espadat.tagwerk
+omarchy plugin add https://github.com/espadat-studio/omarchy-tagwerk --enable
 ```
+
+Installed it before by copying `/usr/share/tagwerk/omarchy/` out of the package? Remove the copy first, or the add fails with `already installed`:
+
+```sh
+omarchy plugin remove espadat.tagwerk
+omarchy plugin add https://github.com/espadat-studio/omarchy-tagwerk --enable
+```
+
+The copy is not deleted: it moves to a hidden `.espadat.tagwerk.bak.<timestamp>` folder beside it, which the plugin catalog ignores.
 
 | What you see                                                                                                                                                                                                                        | What it is                                                                                                                                                                                                                                          |
 | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -23,4 +32,4 @@ Hover prints work, personal, presence, and the time left or over. Click opens `t
 
 It runs `tagwerk day --json` every 300 s and draws four rectangles. Nothing else: it never reads the ledger, never reads your config, and never re-implements the cap rule — `over_cap` arrives already computed (ADR-0011). Change `refreshIntervalSec` in the widget's settings; below 15 minutes the fill moves less than a pixel, so the interval buys the notch crossing and nothing more.
 
-A copy, not a symlink: `omarchy plugin validate` refuses any symlink inside a plugin folder, so a linked install cannot be checked. The directory name must equal the manifest id, because that is how the shell maps a changed file back to its plugin. Re-copy after a `tagwerk-git` update; the shell hot-reloads the widget on the write.
+`omarchy plugin update espadat.tagwerk` pulls a newer commit, and the shell hot-reloads the widget on the write. `omarchy plugin disable espadat.tagwerk` keeps it installed and only takes it off the bar; `omarchy plugin remove espadat.tagwerk` deletes it.

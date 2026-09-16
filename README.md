@@ -6,15 +6,15 @@
 
 No manual start or stop. The timewarrior setup tagwerk replaces died of manual discipline. Sensors append events, attribution credits every present minute to a project, and reports answer two questions and no others: what goes on this month's invoice, and whether last week was too long a week.
 
-| Piece        | What it does                                                                                         |
-| ------------ | ---------------------------------------------------------------------------------------------------- |
-| Focus poller | `tagwerk focus` as a systemd user service polls window class, title and kitty cwd                    |
-| hypridle     | `tagwerk idle` and `tagwerk active` from the idle listener and around sleep                          |
-| Agent hooks  | Claude Code hooks and a pi extension run `tagwerk beat` with the agent's cwd                         |
-| Ledger       | `~/.local/share/tagwerk/YYYY-MM.jsonl`, append-only, UTC timestamps                                  |
-| Attribution  | a present minute is split evenly across leased repos, else the ambient bucket, else `personal/other` |
-| Reports      | `day`, `week`, `month`, `invoice`; `fix` appends a span                                              |
-| Bar widget   | an Omarchy plugin drawing today's credited hours against the day cap, from `tagwerk day --json`      |
+| Piece        | What it does                                                                                                                                                                            |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Focus poller | `tagwerk focus` as a systemd user service polls window class, title and kitty cwd                                                                                                       |
+| hypridle     | `tagwerk idle` and `tagwerk active` from the idle listener and around sleep                                                                                                             |
+| Agent hooks  | Claude Code hooks and a pi extension run `tagwerk beat` with the agent's cwd                                                                                                            |
+| Ledger       | `~/.local/share/tagwerk/YYYY-MM.jsonl`, append-only, UTC timestamps                                                                                                                     |
+| Attribution  | a present minute is split evenly across leased repos, else the ambient bucket, else `personal/other`                                                                                    |
+| Reports      | `day`, `week`, `month`, `invoice`; `fix` appends a span                                                                                                                                 |
+| Bar widget   | an Omarchy plugin drawing today's credited hours against the day cap, from `tagwerk day --json`; its code lives in [omarchy-tagwerk](https://github.com/espadat-studio/omarchy-tagwerk) |
 
 ## Install
 
