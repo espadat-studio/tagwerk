@@ -61,7 +61,7 @@ One of `work`, `fixed`, `personal`, `off`. Work is paid and invoiced, fixed is p
 _Avoid_: category, type, tag, customer, payer
 
 **Paid**:
-A minute of kind `work` or `fixed`. Paid minutes drive the caps; only `work` reaches the invoice. The `day` and `month` tables and the `week` footer label this subtotal `work`, the older of the two paid kinds.
+A minute of kind `work` or `fixed`. Paid minutes drive the week cap; only `work` reaches the invoice. The `day` and `month` tables and the `week` footer label this subtotal `work`, the older of the two paid kinds.
 _Avoid_: billable, chargeable
 
 **Project**:
@@ -115,7 +115,7 @@ The stretch of days one report covers, named in that report's own unit: a day, a
 _Avoid_: range, window, timeframe, span
 
 **Cap**:
-A daily or weekly threshold on paid hours above which reports highlight the period. Caps change colours, never numbers.
+A daily or weekly threshold above which reports highlight the period. The day cap measures every credited minute, the week cap only the paid ones. Caps change colours, never numbers.
 _Avoid_: limit, quota, budget
 
 **Invoice**:
