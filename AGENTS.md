@@ -16,4 +16,4 @@ Single-context: `CONTEXT.md` and `meta/adr/` at the repo root. See `meta/agents/
 
 Internal material lives under `meta/`: decisions in `meta/adr/`, research in `meta/research/`, agent-facing operational reference in `meta/agents/`. The root holds `AGENTS.md`, `CONTEXT.md`, `README.md` and code.
 
-`docs/` is reserved for the Starlight site that publishes tagwerk.espadat.com, matching `auberge`, `dublette` and `colporteur`. Nothing internal goes there.
+`docs/` is the Starlight site at tagwerk.espadat.com, matching `auberge`, `dublette` and `colporteur`. A build directory; pages in `docs/src/content/docs/`. Nothing internal goes there.

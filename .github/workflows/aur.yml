@@ -4,6 +4,9 @@ permissions:
 on:
   push:
     branches: [master]
+    # pkgver() counts commits, so a docs-only push would bump the AUR package
+    # and make every user rebuild for nothing. Mirrors docs.yml's paths.
+    paths-ignore: [docs/**, .github/workflows/docs.yml]
   workflow_dispatch:
 
 concurrency:

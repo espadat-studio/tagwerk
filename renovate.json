@@ -23,6 +23,12 @@
       "description": "The hk binary (.config/mise.toml) and the hk Pkl schema (hk.pkl) must move together, including on major bumps that group:allNonMajor splits",
       "matchDepNames": ["hk"],
       "groupName": "hk"
+    },
+    {
+      "description": "docs/ is the Starlight site, not the packaged tool. config:recommended types npm `dependencies` bumps as fix; nothing under docs/ reaches usr/bin/tagwerk, so they stay chore",
+      "matchManagers": ["npm"],
+      "semanticCommitType": "chore",
+      "semanticCommitScope": "deps"
     }
   ]
 }
