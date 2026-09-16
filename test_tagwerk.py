@@ -1649,6 +1649,26 @@ def test_the_site_documents_the_install_commands_doctor_prints() -> None:
     assert f"```sh\n{tagwerk.PI_INSTALL}\n```" in page
 
 
+def test_the_config_page_lists_every_template_key_with_its_default() -> None:
+    scalars = tagwerk.CONFIG_TEMPLATE.split("[roots]")[0]
+    keys = re.findall(r"^(\w+) = (.+?)(?: #|$)", scalars, re.MULTILINE)
+    assert len(keys) == 10
+    rows = [row for row in (DOCS / "configuration.md").read_text().splitlines() if row.startswith("|")]
+    for key, raw in keys:
+        default = raw.strip().strip('"')
+        assert any(f"`{key}`" in row and f"`{default}`" in row for row in rows), f"{key} = {default}"
+
+
+def test_the_cli_reference_documents_every_subcommand(capsys: pytest.CaptureFixture[str]) -> None:
+    with pytest.raises(SystemExit):
+        tagwerk.main(["--help"])
+    choices = re.search(r"\{([a-z,\-]+)\}", capsys.readouterr().out)
+    assert choices
+    page = (DOCS / "cli-reference.md").read_text()
+    for command in choices.group(1).split(","):
+        assert f"tagwerk {command}" in page, command
+
+
 def test_each_install_command_targets_the_path_doctor_consults() -> None:
     assert tagwerk.CLAUDE_SETTINGS in tagwerk.CLAUDE_HOOKS_INSTALL
     assert tagwerk.PI_LINK in tagwerk.PI_INSTALL
