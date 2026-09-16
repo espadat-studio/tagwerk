@@ -42,6 +42,8 @@ Omarchy's shell already runs the screensaver at 150 s and the lock at 300 s, so 
 
 The poller reads the kitty cwd over kitty remote control on Omarchy's per-pid socket. `/etc/xdg/kitty/kitty.conf` already sets `allow_remote_control socket-only` and `listen_on`; a user `kitty.conf` must not override them. A kitty started outside Omarchy's config has no socket; its cwd is written as `null` and the poller keeps running.
 
+The [agent hooks](#agent-hooks) below are part of the install: without them a present minute of background agent work is credited to the focused window instead of the agent's repo.
+
 ## Agent hooks
 
 Claude Code:
@@ -73,6 +75,14 @@ tagwerk day
 ```
 
 Both units should be `active (running)`. The `focus` lines carry a path in `cwd` while kitty was focused and `null` otherwise, and `day` lists the repo you were in. Leave the machine for three minutes: an `idle` line appears, then `active` when you come back. Poller errors go to `journalctl --user -u tagwerk-focus.service`; systemd restarts it after 5 s.
+
+After an agent turn in a repo under one of your `[roots]`:
+
+```sh
+grep '"ev": "beat"' ~/.local/share/tagwerk/$(date -u +%Y-%m).jsonl | tail -n 3
+```
+
+A `beat` line carrying that repo's path in `cwd` means the hooks reached the ledger. No line means the hooks are not installed or the agent ran outside every root; `tagwerk beat` drops a cwd it cannot resolve and exits 0, so nothing else reports it. Beats throttle to one per agent and cwd per minute, so check the `ts` on the last line, not the count.
 
 ## Migrating from timewarrior
 
@@ -145,6 +155,7 @@ Both flags go before the subcommand. Reports colour only when both stdout and st
 - Colours come from five hues that pass the contrast check; past a handful of work repos two will share one.
 - Spans written before `ts` carried microseconds resolve by file order when two of them share a second across month files; their append order was never recorded, so no rewrite can fix it (ADR-0009).
 - Reports rescan the month files on every run; a month is about 43k minutes and a few thousand events, fine for years of data.
+- A dark sensor raises no warning: nothing cross-checks that the three sensors are still appending, so `day`, `week` and `invoice` print plausible numbers over missing input. Rerun Verify after any change to the hooks or the roots, until a health check ships.
 - One machine, no web UI, no sync, no `--json`, no notifications.
 
 ## Development
