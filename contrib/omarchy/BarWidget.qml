@@ -12,10 +12,10 @@ BarWidget {
   id: root
   moduleName: "sripwoud.tagwerk"
 
-  // The track spans more than the cap, so closing on it is a position to
-  // watch rather than a threshold that trips. 1.25 puts the cap notch at
-  // 80% of the track and leaves the overrun visible past it.
-  readonly property real spanFactor: 1.25
+  // The track reaches past the cap, so closing on it is a position to watch
+  // rather than a threshold that trips. 1.25 puts the cap notch at 80% of
+  // the track and leaves the overrun visible past it.
+  readonly property real trackFactor: 1.25
   readonly property real trackLength: Style.space(40)
   readonly property real thickness: Style.space(4)
 
@@ -28,18 +28,17 @@ BarWidget {
   property bool loaded: false
   property string failure: ""
 
-  readonly property real span: capMinutes * spanFactor
-  readonly property real remainingMinutes: Math.abs(capMinutes - totalMinutes)
+  readonly property real trackMinutes: capMinutes * trackFactor
 
   // Colour's only job. `over_cap` is Python's verdict, so there is no second
   // threshold here and no "approaching" hue: proximity is the fill's length.
   readonly property color fillColor: overCap ? button.activeColor : button.foreground
 
   function fraction(minutes) {
-    return span > 0 ? Math.max(0, Math.min(1, minutes / span)) : 0
+    return trackMinutes > 0 ? Util.clamp(minutes / trackMinutes, 0, 1) : 0
   }
 
-  function clock(minutes) {
+  function formatHours(minutes) {
     var whole = Math.max(0, Math.round(minutes))
     return Math.floor(whole / 60) + ":" + ("0" + (whole % 60)).slice(-2)
   }
@@ -67,10 +66,10 @@ BarWidget {
     ? "tagwerk: " + failure
     : !loaded
       ? "tagwerk: reading today"
-      : "work " + clock(paidMinutes)
-        + " · personal " + clock(totalMinutes - paidMinutes)
-        + " · present " + clock(totalMinutes)
-        + " · " + clock(remainingMinutes) + (overCap ? " over" : " left")
+      : "work " + formatHours(paidMinutes)
+        + " · personal " + formatHours(totalMinutes - paidMinutes)
+        + " · present " + formatHours(totalMinutes)
+        + " · " + formatHours(Math.abs(capMinutes - totalMinutes)) + (overCap ? " over" : " left")
 
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
@@ -131,7 +130,6 @@ BarWidget {
         color: Style.selectedFillFor(button.foreground, Color.accent)
       }
 
-      // Presence: the fill's right edge is `total_minutes`.
       Rectangle {
         anchors.left: track.left
         anchors.verticalCenter: track.verticalCenter
@@ -145,8 +143,8 @@ BarWidget {
         }
       }
 
-      // Paid: the solid stretch inside presence. What is left of the
-      // translucent fill past its right edge is personal.
+      // What is left of the translucent fill past this one's right edge
+      // is the personal share.
       Rectangle {
         anchors.left: track.left
         anchors.verticalCenter: track.verticalCenter
@@ -163,11 +161,11 @@ BarWidget {
       // The cap, last so the fill arriving does not swallow it.
       Rectangle {
         anchors.verticalCenter: track.verticalCenter
-        x: track.width / root.spanFactor
+        x: track.width / root.trackFactor
         width: Style.space(1)
         height: track.height
-        visible: root.span > 0
-        color: Color.bar.background
+        visible: root.trackMinutes > 0
+        color: root.bar ? root.bar.background : Color.bar.background
       }
     }
   }

@@ -5,14 +5,14 @@
   "version": "1.0.0",
   "author": "sripwoud",
   "license": "AGPL-3.0-or-later",
-  "description": "Today's presence against the tagwerk day cap, as a meter in the bar.",
+  "description": "Today's credited hours against the tagwerk day cap, as a meter in the bar.",
   "kinds": ["bar-widget"],
   "entryPoints": {
     "barWidget": "BarWidget.qml"
   },
   "barWidget": {
     "displayName": "tagwerk",
-    "description": "A meter running to today's presence, with the paid split solid inside it and the day cap notched on the track. Click opens the week table.",
+    "description": "A meter running to today's credited minutes, with the paid split solid inside it and the day cap notched on the track. Click opens the week table.",
     "category": "Time",
     "aliases": ["tagwerk", "hours"],
     "allowMultiple": false,
