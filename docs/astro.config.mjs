@@ -31,6 +31,7 @@ export default defineConfig({
         { slug: "concepts" },
         { slug: "configuration" },
         { slug: "cli-reference" },
+        { slug: "bar-widget" },
         { slug: "troubleshooting" },
         { slug: "migration" },
         { slug: "development" },
