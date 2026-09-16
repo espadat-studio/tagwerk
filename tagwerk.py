@@ -12,6 +12,7 @@ from collections import defaultdict
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
+from functools import partial
 from itertools import groupby
 from pathlib import Path
 from time import monotonic, sleep
@@ -435,6 +436,23 @@ def render_table(minutes: dict[Bucket, float]) -> str:
     return "\n".join(f"{name:<{name_width}}  {hours:>{hours_width}}" for name, hours in cells)
 
 
+def render_json(minutes: dict[Bucket, float], day: date, cap_h: float) -> str:
+    total, cap = round(sum(minutes.values())), round(cap_h * 60)
+    return json.dumps(
+        {
+            "day": day.isoformat(),
+            "buckets": [
+                {"kind": bucket.kind, "project": bucket.project, "minutes": round(credited)}
+                for bucket, credited in ranked(minutes)
+            ],
+            "paid_minutes": round(paid_minutes(minutes)),
+            "total_minutes": total,
+            "cap_minutes": cap,
+            "over_cap": total > cap,
+        }
+    )
+
+
 def quarter_hours(minutes: dict[str, float]) -> dict[str, float]:
     quarters = {project: int(credited // 15) for project, credited in minutes.items()}
     spare = round(sum(minutes.values()) / 15) - sum(quarters.values())
@@ -760,6 +778,13 @@ def main(argv: list[str]) -> int:
     )
     day = commands.add_parser("day", parents=[plain], help="hours per kind/project for the local day")
     add_period(day, "day", parse_day, "YYYY-MM-DD")
+    day.add_argument(
+        "--json",
+        action="store_true",
+        help="one JSON object instead of the table: day, then buckets, each one kind, project and rounded "
+        "minutes in table order, then paid_minutes (work plus fixed), total_minutes, cap_minutes (the day cap) "
+        "and over_cap (total_minutes above cap_minutes)",
+    )
     week = commands.add_parser(
         "week", parents=[plain], help="one bar per day, Monday to Sunday, with the day and week caps"
     )
@@ -823,7 +848,11 @@ def main(argv: list[str]) -> int:
     elif args.command == "import-timew":
         cmd_import_timew(config, args.work_tag, args.file)
     elif args.command == "day":
-        report(config, *local_day(args.period or local_today() - timedelta(days=args.ago)), render_table)
+        selected = args.period or local_today() - timedelta(days=args.ago)
+        render: Callable[[dict[Bucket, float]], str] = (
+            partial(render_json, day=selected, cap_h=config.day_cap_h) if args.json else render_table
+        )
+        report(config, *local_day(selected), render)
     elif args.command == "doctor":
         return cmd_doctor(config)
     return 0

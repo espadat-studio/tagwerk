@@ -719,6 +719,130 @@ def test_a_future_period_renders_an_empty_report_and_exits_zero(
     assert total not in "\n".join(lines(capsys, command, "--ago", "-1"))
 
 
+def day_json(capsys: pytest.CaptureFixture[str], *argv: str) -> dict[str, Any]:
+    [out] = lines(capsys, "day", "--json", *argv)
+    parsed: dict[str, Any] = json.loads(out)
+    return parsed
+
+
+def set_day_cap(tmp_path: Path, hours: float) -> None:
+    config = tmp_path / "config.toml"
+    config.write_text(f"{config.read_text()}day_cap_h = {hours}\n")
+
+
+def test_day_json_carries_the_buckets_subtotals_cap_and_verdict(
+    data_dir: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    run(capsys, "fix", "09:00", "10:30", "assets")
+    run(capsys, "fix", "11:00", "11:20", "auberge", "--kind", "personal")
+    assert day_json(capsys) == {
+        "day": f"{datetime.now(UTC).astimezone().date()}",
+        "buckets": [
+            {"kind": "work", "project": "assets", "minutes": 90},
+            {"kind": "personal", "project": "auberge", "minutes": 20},
+        ],
+        "paid_minutes": 90,
+        "total_minutes": 110,
+        "cap_minutes": 480,
+        "over_cap": False,
+    }
+
+
+def test_day_json_figures_equal_the_same_runs_table(data_dir: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    run(capsys, "fix", "09:00", "10:20", "assets")
+    run(capsys, "fix", "10:20", "11:05", "auberge", "--kind", "fixed")
+    run(capsys, "fix", "11:05", "12:00", "blog", "--kind", "personal")
+    parsed = day_json(capsys)
+    rows = run(capsys, "day")
+    assert [
+        [f"{bucket['kind']}/{bucket['project']}", tagwerk.format_hours(bucket["minutes"])]
+        for bucket in parsed["buckets"]
+    ] == rows[:-2]
+    assert rows[-2:] == [
+        ["work", tagwerk.format_hours(parsed["paid_minutes"])],
+        ["total", tagwerk.format_hours(parsed["total_minutes"])],
+    ]
+
+
+@pytest.mark.parametrize(("end", "total", "over"), [("13:00", 240, False), ("13:01", 241, True)])
+def test_day_json_is_over_cap_only_above_the_cap(
+    data_dir: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str], end: str, total: int, over: bool
+) -> None:
+    set_day_cap(tmp_path, 4)
+    run(capsys, "fix", "09:00", end, "assets")
+    parsed = day_json(capsys)
+    assert (parsed["cap_minutes"], parsed["total_minutes"], parsed["over_cap"]) == (240, total, over)
+
+
+def test_day_json_crosses_the_cap_on_personal_minutes_alone(
+    data_dir: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    set_day_cap(tmp_path, 4)
+    run(capsys, "fix", "09:00", "14:00", "auberge", "--kind", "personal")
+    parsed = day_json(capsys)
+    assert (parsed["paid_minutes"], parsed["total_minutes"], parsed["over_cap"]) == (0, 300, True)
+
+
+def test_day_json_buckets_round_one_by_one_so_they_need_not_sum_to_the_total(
+    home: Path, ledger: Path, berlin: None, capsys: pytest.CaptureFixture[str]
+) -> None:
+    seed(ledger, *present(T0, 9), beat(T0, f"{home}/code/work-org/assets"), beat(T0, f"{home}/code/work-org/checkout"))
+    parsed = day_json(capsys, "2026-08-05")
+    assert [bucket["minutes"] for bucket in parsed["buckets"]] == [4, 4]
+    assert (parsed["paid_minutes"], parsed["total_minutes"]) == (9, 9)
+    assert run(capsys, "day", "2026-08-05") == [
+        ["work/assets", "0:04"],
+        ["work/checkout", "0:04"],
+        ["work", "0:09"],
+        ["total", "0:09"],
+    ]
+
+
+def test_day_json_for_an_empty_day_has_no_buckets_and_zero_subtotals(
+    data_dir: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert day_json(capsys, "2099-01-01") == {
+        "day": "2099-01-01",
+        "buckets": [],
+        "paid_minutes": 0,
+        "total_minutes": 0,
+        "cap_minutes": 480,
+        "over_cap": False,
+    }
+
+
+def test_day_json_names_the_day_the_period_selected(data_dir: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    yesterday = datetime.now(UTC).astimezone().date() - timedelta(days=1)
+    assert day_json(capsys, "2026-08-05")["day"] == "2026-08-05"
+    assert day_json(capsys, "--ago", "1")["day"] == f"{yesterday}"
+
+
+def test_day_json_carries_no_escapes_under_force_color(
+    data_dir: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("FORCE_COLOR", "1")
+    run(capsys, "fix", "09:00", "10:00", "assets")
+    [out] = lines(capsys, "day", "--json")
+    assert "\033[" not in out
+
+
+@pytest.mark.parametrize("command", ["week", "month", "invoice", "doctor"])
+def test_json_is_offered_on_day_alone(data_dir: Path, command: str) -> None:
+    with pytest.raises(SystemExit) as raised:
+        tagwerk.main([command, "--json"])
+    assert raised.value.code == 2
+
+
+def test_day_help_documents_every_json_key(data_dir: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    run(capsys, "fix", "09:00", "10:00", "assets")
+    parsed = day_json(capsys)
+    [bucket] = parsed["buckets"]
+    with pytest.raises(SystemExit):
+        tagwerk.main(["day", "--help"])
+    documented = capsys.readouterr().out
+    assert all(key in documented for key in (*parsed, *bucket))
+
+
 def test_the_retired_n_flag_is_gone(data_dir: Path) -> None:
     with pytest.raises(SystemExit) as raised:
         tagwerk.main(["week", "-n", "1"])

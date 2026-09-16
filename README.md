@@ -27,16 +27,16 @@ systemctl --user enable --now tagwerk-idle.service tagwerk-focus.service
 
 Any AUR helper works: `yay -S tagwerk-git`. Without one, `git clone https://aur.archlinux.org/tagwerk-git.git && cd tagwerk-git && makepkg -si` builds the package and installs it through pacman.
 
-In the config, point `[roots]` at your work org's clone directory as `work` and at your personal code directory as `personal`. A fixed-price customer's directory is `fixed`: paid, so it counts toward the caps, but never on the hourly customer's invoice. Make the `[[title]]` patterns match your org's GitHub titles and chat apps. A rule that cannot work is rejected when the config loads, named by its position and its pattern: no `pattern`, no `kind`, a `pattern` that is no regex, or nothing to name the project with. The longest root wins. The project is the first directory below the root, cut at its first dot, so `assets.8467` and `assets` are one project. Every other key ships with its default; the comments in the file `tagwerk init` writes explain each one.
+In the config, point `[roots]` at your work org's clone directory as `work` and at your personal code directory as `personal`. A fixed-price customer's directory is `fixed`: paid, so it counts toward the week cap, but never on the hourly customer's invoice. Make the `[[title]]` patterns match your org's GitHub titles and chat apps. A rule that cannot work is rejected when the config loads, named by its position and its pattern: no `pattern`, no `kind`, a `pattern` that is no regex, or nothing to name the project with. The longest root wins. The project is the first directory below the root, cut at its first dot, so `assets.8467` and `assets` are one project. Every other key ships with its default; the comments in the file `tagwerk init` writes explain each one.
 
-| kind       | counts toward the caps | on the invoice |
-| ---------- | :--------------------: | :------------: |
-| `work`     |          yes           |      yes       |
-| `fixed`    |          yes           |       no       |
-| `personal` |           no           |       no       |
-| `off`      |           no           |       no       |
+| kind       | counts toward the week cap | on the invoice |
+| ---------- | :------------------------: | :------------: |
+| `work`     |            yes             |      yes       |
+| `fixed`    |            yes             |       no       |
+| `personal` |             no             |       no       |
+| `off`      |             no             |       no       |
 
-A kind never names the payer. `off` belongs to a span, not to a root or a title rule: the config rejects it there, and `tagwerk fix --kind off` books it.
+The day cap asks a different question and no kind answers it: it counts every credited minute, `personal` included (ADR-0011). A kind never names the payer. `off` belongs to a span, not to a root or a title rule: the config rejects it there, and `tagwerk fix --kind off` books it.
 
 Omarchy's shell already runs the screensaver at 150 s and the lock at 300 s, so `tagwerk-idle.service` runs hypridle on the packaged `/usr/share/tagwerk/hypridle.conf`, which only feeds the ledger. Its listener fires at the same 150 s without input and no minutes fall between screensaver and lock. If you already run `hypridle.service` with your own config, add its `tagwerk idle` and `tagwerk active` lines there and skip `tagwerk-idle.service`.
 
@@ -120,7 +120,7 @@ Times are local; `HH:MM` means today. Every report takes an optional period in i
 | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `tagwerk`                                     | the description, two examples and where to go next; no command is not an error                                                                                                                                                    |
 | `tagwerk init`                                | write the commented config template to `~/.config/tagwerk/config.toml`; refuses to overwrite                                                                                                                                      |
-| `tagwerk day [YYYY-MM-DD]`                    | hours per `kind/project` for the local day, the paid `work` subtotal, total                                                                                                                                                       |
+| `tagwerk day [YYYY-MM-DD] [--json]`           | hours per `kind/project` for the local day, the paid `work` subtotal, total; `--json` prints the same figures as one object                                                                                                       |
 | `tagwerk week [YYYY-Www]`                     | one bar per day, Monday to Sunday; cap marker, red over the day cap or on a weekend with minutes                                                                                                                                  |
 | `tagwerk month [YYYY-MM]`                     | one bar per ISO week, then hours per `kind/project`                                                                                                                                                                               |
 | `tagwerk invoice [YYYY-MM]`                   | markdown table of `work` hours per project in quarter hours; rows sum to the rounded total; `fixed` never appears                                                                                                                 |
@@ -146,6 +146,22 @@ tagwerk --config ~/side-gig/tagwerk.toml invoice 2026-08
 
 Both flags go before the subcommand. Reports colour only when both stdout and stderr are terminals; `--no-color`, `NO_COLOR` and `TERM=dumb` each turn it off, and `FORCE_COLOR` overrides all three.
 
+`day --json` prints one object on stdout and never colours. Buckets come in the table's own order, every minute value is a rounded integer, and `over_cap` compares `total_minutes` against `cap_minutes`, the day cap (ADR-0011). Buckets round one by one and the total rounds the raw sum, so the rows need not add up to it, exactly as in the table.
+
+```json
+{
+  "day": "2026-09-16",
+  "buckets": [
+    { "kind": "work", "project": "tagwerk", "minutes": 312 },
+    { "kind": "personal", "project": "auberge", "minutes": 47 }
+  ],
+  "paid_minutes": 312,
+  "total_minutes": 359,
+  "cap_minutes": 480,
+  "over_cap": false
+}
+```
+
 ## Attribution notes
 
 - A minute is present when you are not idle and a poll landed within the last 2 minutes. Present minutes are credited exactly once, so daily totals equal wall-clock presence.
@@ -153,7 +169,7 @@ Both flags go before the subcommand. Reports colour only when both stdout and st
 - Beats while idle book nothing. An unattended overnight agent adds no hours; credit resumes on the still-valid lease when you return.
 - With no lease the focused window decides. A kitty shell sitting at a root books that kind's `general`; a work-pattern title (Slack, Zoom, Meet, your org) books `work/general`; anything else books `personal/other`.
 - Idle inhibitors are honoured, so a video call with your hands off the keyboard stays present. In exchange an abandoned video also stays present and books `personal/other`; that inflates the chart, never the invoice. If the chart looks inflated, copy `/usr/share/tagwerk/hypridle.conf`, set `ignore_dbus_inhibit = true` in the copy, and point hypridle's `--config` at it with `systemctl --user edit tagwerk-idle.service`.
-- `work` and `fixed` are both paid: both drive the day and week caps and both land in the `work` subtotal. Only `work` reaches `tagwerk invoice`, so fixed-price hours show up in the burnout check and never on an hourly customer's bill (ADR-0006).
+- `work` and `fixed` are both paid: both drive the week cap and both land in the `work` subtotal. Only `work` reaches `tagwerk invoice`, so fixed-price hours show up in the burnout check and never on an hourly customer's bill (ADR-0006). The day cap measures every credited minute instead, `personal` included, because burnout does not care who paid for the hour (ADR-0011).
 - A span overrides the sensors for its whole range, no partial merge, and the latest appended span wins on overlap. Nothing in the ledger is ever edited (ADR-0002).
 - A renamed repo keeps one row in every report: add `"old-name" = "new-name"` under `[rename]` and the old name folds into the new one for all time, past months included. The kind is never rewritten, so minutes credited as `personal` stay personal even if the project now sits under a work root (ADR-0010).
 
@@ -170,7 +186,8 @@ Both flags go before the subcommand. Reports colour only when both stdout and st
 - `doctor` judges a root by whether it is a directory right now, so a root on an unmounted drive reads `suspect` until you mount it. It costs a row and exit 3, never a number in a report.
 - `doctor` tests each `[[title]]` pattern against every title on its own, so a pattern permanently shadowed by an earlier one still reads clear. Attribution takes the first match, and replaying that order across the whole ledger would cost more than the typo it would catch.
 - Exit 2 is shared: argparse spends it on a usage error, so `tagwerk doctor --bogus` alarms a prompt exactly as a dark sensor does.
-- One machine, no web UI, no sync, no `--json`, no notifications.
+- `day --json` judges `over_cap` on the whole minutes it prints, while the `week` bar reddens on the raw total. A day landing within half a minute of the cap can read over in one and under in the other; self-consistent JSON was worth more than agreement at that boundary.
+- One machine, no web UI, no sync, no notifications. `--json` is `day` alone; every other report is text for a human to read.
 
 ## Development
 
