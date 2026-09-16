@@ -1,10 +1,12 @@
 import starlight from "@astrojs/starlight";
 import { defineConfig } from "astro/config";
+import starlightLlmsTxt from "starlight-llms-txt";
 
 export default defineConfig({
   site: "https://tagwerk.espadat.com",
   integrations: [
     starlight({
+      plugins: [starlightLlmsTxt()],
       title: "tagwerk",
       description: "Passive time tracker for Hyprland on Arch, nothing to start or stop. Every present minute books to a project: the repo under your kitty terminal, the repo your Claude Code or pi agent works in, or what the focused window implies, so a Slack thread or a Zoom call counts as work too. Built on Omarchy 4.",
       logo: { src: "./src/assets/mark.svg", alt: "Espadat" },
