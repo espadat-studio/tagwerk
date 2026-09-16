@@ -6,7 +6,7 @@ export default defineConfig({
   integrations: [
     starlight({
       title: "tagwerk",
-      description: "Passive work-hours ledger for one Linux desktop running Hyprland, kitty and Omarchy.",
+      description: "Passive per-repo time tracker for Hyprland. Nothing to start or stop: it credits minutes from the focused window, the terminal cwd and Claude Code or pi agent hooks.",
       logo: { src: "./src/assets/mark.svg", alt: "Espadat" },
       head: [{ tag: "link", attrs: { rel: "icon", href: "/favicon.ico", sizes: "16x16 32x32" } }],
       customCss: ["@espadat/docs-theme/styles/theme.css"],

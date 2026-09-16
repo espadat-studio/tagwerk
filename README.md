@@ -2,9 +2,9 @@
 
 [![AUR](https://img.shields.io/aur/version/tagwerk-git?label=AUR&color=1793d1)](https://aur.archlinux.org/packages/tagwerk-git)
 
-> Passive work-hours ledger for one Linux desktop
+> Work hours that track themselves, per repo, with your coding agents' time counted too.
 
-No manual start or stop. The timewarrior setup tagwerk replaces died of manual discipline. Sensors append events, attribution credits every present minute to a project, and reports answer two questions and no others: what goes on this month's invoice, and whether last week was too long a week.
+Every CLI time tracker is manual, and manual discipline is what killed the timewarrior setup this one replaces: a forgotten start, a forgotten stop. tagwerk has no start and no stop. On Hyprland it watches which window has focus, which repo your terminal or coding agent sits in, and whether you are idle, then credits every present minute to a project. It answers two questions and no others: what goes on this month's invoice, and whether last week was too long a week.
 
 | Piece        | What it does                                                                                                                                                                            |
 | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

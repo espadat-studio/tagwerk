@@ -1,11 +1,11 @@
 ---
 title: tagwerk
-description: Passive work-hours ledger for one Linux desktop running Hyprland, kitty and Omarchy.
+description: "Passive per-repo time tracker for Hyprland. Nothing to start or stop: it credits minutes from the focused window, the terminal cwd and Claude Code or pi agent hooks."
 ---
 
-Passive work-hours ledger for one Linux desktop running Hyprland, kitty and Omarchy. Zero manual start or stop: the timewarrior setup it replaces died of manual discipline.
+> Work hours that track themselves, per repo, with your coding agents' time counted too.
 
-It answers two questions and no others — what goes on this month's invoice, and whether last week was too long a week.
+Every CLI time tracker is manual, and manual discipline is what killed the timewarrior setup this one replaces: a forgotten start, a forgotten stop. tagwerk has no start and no stop. On Hyprland it watches which window has focus, which repo your terminal or coding agent sits in, and whether you are idle, then credits every present minute to a project. It answers two questions and no others: what goes on this month's invoice, and whether last week was too long a week.
 
 ## Where the minutes come from
 
