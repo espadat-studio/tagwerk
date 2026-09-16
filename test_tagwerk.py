@@ -938,6 +938,76 @@ def test_a_root_or_title_rule_outside_the_three_kinds_is_rejected_at_load(
     assert "fix --kind off" in str(raised.value)
 
 
+@pytest.mark.parametrize(
+    ("rule", "named", "said"),
+    [
+        ('[[title]]\nkind = "work"\n', "title rule 1", "no pattern"),
+        ("title = [1]\n", "title rule 1", "no pattern"),
+        ('[[title]]\npattern = 3\nkind = "work"\n', "title rule 1", "no pattern"),
+        ('[[title]]\npattern = "Slack"\n', "title rule 1 'Slack'", "no kind"),
+        ('[[title]]\npattern = "(unclosed"\nkind = "work"\n', "title rule 1 '(unclosed'", "unterminated subpattern"),
+        ('[title]\npattern = "Slack"\nkind = "work"\nproject = "general"\n', "[title]", "[[title]]"),
+        ('[[title]]\npattern = "Slack"\nkind = "work"\n', "title rule 1 'Slack'", "(?P<project>"),
+        ('[[title]]\npattern = "Slack"\nkind = "work"\nproject = ""\n', "title rule 1 'Slack'", "(?P<project>"),
+    ],
+)
+def test_a_title_rule_that_cannot_work_is_rejected_at_load(
+    home: Path, monkeypatch: pytest.MonkeyPatch, rule: str, named: str, said: str
+) -> None:
+    config = home / "config.toml"
+    config.write_text(f'data_dir = "{home}/data"\n' + rule)
+    monkeypatch.setenv("TAGWERK_CONFIG", str(config))
+    with pytest.raises(SystemExit) as raised:
+        tagwerk.main(["day"])
+    assert raised.value.code
+    assert str(config) in str(raised.value)
+    assert named in str(raised.value)
+    assert said in str(raised.value)
+
+
+def test_a_broken_title_rule_is_named_by_its_position_among_the_rules(
+    home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (home / "config.toml").write_text(
+        f'data_dir = "{home}/data"\n'
+        "[[title]]\npattern = 'sripwoud/(?P<project>[\\w.-]+)'\nkind = \"personal\"\n"
+        '[[title]]\npattern = "Slack"\nkind = "work"\n'
+    )
+    monkeypatch.setenv("TAGWERK_CONFIG", str(home / "config.toml"))
+    with pytest.raises(SystemExit) as raised:
+        tagwerk.main(["day"])
+    assert "title rule 2 'Slack'" in str(raised.value)
+
+
+@pytest.mark.parametrize(
+    ("rule", "title", "rows"),
+    [
+        (
+            "[[title]]\npattern = 'sripwoud/(?P<project>[\\w.-]+)'\nkind = \"personal\"\n",
+            "sripwoud/tagwerk: Fix rounding · GitHub",
+            [["personal/tagwerk", "0:05"], ["work", "0:00"], ["total", "0:05"]],
+        ),
+        (
+            '[[title]]\npattern = "(?i)slack"\nkind = "work"\nproject = "general"\n',
+            "#next-lending - work-org - Slack",
+            [["work/general", "0:05"], ["work", "0:05"], ["total", "0:05"]],
+        ),
+    ],
+)
+def test_a_title_rule_that_names_its_project_loads_and_books_its_minutes(
+    home: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    rule: str,
+    title: str,
+    rows: list[list[str]],
+) -> None:
+    (home / "config.toml").write_text(f'data_dir = "{home}/data"\n' + rule)
+    monkeypatch.setenv("TAGWERK_CONFIG", str(home / "config.toml"))
+    seed(home / "data", *present(T0, 5, title=title))
+    assert table(capsys, "month", "2026-08") == rows
+
+
 def test_a_rename_folds_the_old_and_new_paths_into_one_project(
     home: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
