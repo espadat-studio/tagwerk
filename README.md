@@ -120,7 +120,7 @@ Times are local; `HH:MM` means today. Every report takes an optional period in i
 | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `tagwerk`                                     | the description, two examples and where to go next; no command is not an error                                                                                                                                                    |
 | `tagwerk init`                                | write the commented config template to `~/.config/tagwerk/config.toml`; refuses to overwrite                                                                                                                                      |
-| `tagwerk day [YYYY-MM-DD]`                    | hours per `kind/project` for the local day, the paid `work` subtotal, total                                                                                                                                                       |
+| `tagwerk day [YYYY-MM-DD] [--json]`           | hours per `kind/project` for the local day, the paid `work` subtotal, total; `--json` prints the same figures as one object                                                                                                       |
 | `tagwerk week [YYYY-Www]`                     | one bar per day, Monday to Sunday; cap marker, red over the day cap or on a weekend with minutes                                                                                                                                  |
 | `tagwerk month [YYYY-MM]`                     | one bar per ISO week, then hours per `kind/project`                                                                                                                                                                               |
 | `tagwerk invoice [YYYY-MM]`                   | markdown table of `work` hours per project in quarter hours; rows sum to the rounded total; `fixed` never appears                                                                                                                 |
@@ -146,6 +146,22 @@ tagwerk --config ~/side-gig/tagwerk.toml invoice 2026-08
 
 Both flags go before the subcommand. Reports colour only when both stdout and stderr are terminals; `--no-color`, `NO_COLOR` and `TERM=dumb` each turn it off, and `FORCE_COLOR` overrides all three.
 
+`day --json` prints one object on stdout and never colours. Buckets come in the table's own order, every minute value is a rounded integer, and `over_cap` compares `total_minutes` against `cap_minutes`, the day cap (ADR-0011). Buckets round one by one and the total rounds the raw sum, so the rows need not add up to it, exactly as in the table.
+
+```json
+{
+  "day": "2026-09-16",
+  "buckets": [
+    { "kind": "work", "project": "tagwerk", "minutes": 312 },
+    { "kind": "personal", "project": "auberge", "minutes": 47 }
+  ],
+  "paid_minutes": 312,
+  "total_minutes": 359,
+  "cap_minutes": 480,
+  "over_cap": false
+}
+```
+
 ## Attribution notes
 
 - A minute is present when you are not idle and a poll landed within the last 2 minutes. Present minutes are credited exactly once, so daily totals equal wall-clock presence.
@@ -170,7 +186,7 @@ Both flags go before the subcommand. Reports colour only when both stdout and st
 - `doctor` judges a root by whether it is a directory right now, so a root on an unmounted drive reads `suspect` until you mount it. It costs a row and exit 3, never a number in a report.
 - `doctor` tests each `[[title]]` pattern against every title on its own, so a pattern permanently shadowed by an earlier one still reads clear. Attribution takes the first match, and replaying that order across the whole ledger would cost more than the typo it would catch.
 - Exit 2 is shared: argparse spends it on a usage error, so `tagwerk doctor --bogus` alarms a prompt exactly as a dark sensor does.
-- One machine, no web UI, no sync, no `--json`, no notifications.
+- One machine, no web UI, no sync, no notifications. `--json` is `day` alone; every other report is text for a human to read.
 
 ## Development
 
