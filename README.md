@@ -13,7 +13,7 @@ Passive work-hours ledger for one Linux desktop running Hyprland, kitty and Omar
 | Attribution  | a present minute is split evenly across leased repos, else the ambient bucket, else `personal/other` |
 | Reports      | `day`, `week`, `month`, `invoice`; `fix` appends a span                                              |
 
-Vocabulary: `CONTEXT.md`. Decisions with their trade-offs: `docs/adr/`. Spec and tickets: [issue #4](https://github.com/sripwoud/tagwerk/issues/4).
+Vocabulary: `CONTEXT.md`. Decisions with their trade-offs: `meta/adr/`. Spec and tickets: [issue #4](https://github.com/sripwoud/tagwerk/issues/4).
 
 ## Install
 

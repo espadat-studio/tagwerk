@@ -2,16 +2,18 @@
 
 ### Issue tracker
 
-Issues live in GitHub Issues for `sripwoud/tagwerk` via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+Issues live in GitHub Issues for `sripwoud/tagwerk` via the `gh` CLI. See `meta/agents/issue-tracker.md`.
 
 ### Triage labels
 
-Default five-role vocabulary; each label string equals its role name. See `docs/agents/triage-labels.md`.
+Default five-role vocabulary; each label string equals its role name. See `meta/agents/triage-labels.md`.
 
 ### Domain docs
 
-Single-context: `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+Single-context: `CONTEXT.md` and `meta/adr/` at the repo root. See `meta/agents/domain.md`.
 
 ### Docs layout
 
-Plans, specs and research live under `docs/`. Agent-facing operational reference lives under `docs/agents/`. The root holds `AGENTS.md`, `CONTEXT.md`, `README.md` and code.
+Internal material lives under `meta/`: decisions in `meta/adr/`, research in `meta/research/`, agent-facing operational reference in `meta/agents/`. The root holds `AGENTS.md`, `CONTEXT.md`, `README.md` and code.
+
+`docs/` is reserved for the Starlight site that publishes tagwerk.espadat.com, matching `auberge`, `dublette` and `colporteur`. Nothing internal goes there.
