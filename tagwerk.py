@@ -59,6 +59,12 @@ class Bucket(NamedTuple):
         return self.project not in CATCH_ALLS
 
 
+class Root(NamedTuple):
+    path: Path
+    kind: str
+    as_written: str
+
+
 class Finding(NamedTuple):
     sensor: str
     when: str
@@ -87,7 +93,7 @@ class Config:
     beat_lease: timedelta
     beat_throttle: timedelta
     focus_lease: timedelta
-    roots: list[tuple[Path, str]]
+    roots: list[Root]
     titles: list[TitleRule]
     renames: dict[str, str]
     poll_sec: float
@@ -159,8 +165,8 @@ def load_config(path: Path, data_dir: Path | None) -> Config:
                 "book off time with tagwerk fix --kind off"
             )
     chosen = data_dir or os.environ.get("TAGWERK_DATA_DIR") or raw.get("data_dir") or default_data_dir()
-    roots = [(Path(root).expanduser(), kind) for root, kind in raw.get("roots", {}).items()]
-    roots.sort(key=lambda root: len(root[0].parts), reverse=True)
+    roots = [Root(Path(root).expanduser(), kind, root) for root, kind in raw.get("roots", {}).items()]
+    roots.sort(key=lambda root: len(root.path.parts), reverse=True)
     renames = raw.get("rename", {})
     for old, new in renames.items():
         if old in CATCH_ALLS or new in CATCH_ALLS:
@@ -197,11 +203,11 @@ def resolve_cwd(config: Config, cwd: str | None) -> Bucket | None:
     if cwd is None:
         return None
     path = Path(cwd)
-    for root, kind in config.roots:
-        if path.is_relative_to(root):
-            below = path.relative_to(root).parts
+    for root in config.roots:
+        if path.is_relative_to(root.path):
+            below = path.relative_to(root.path).parts
             # ponytail: the project ends at the first dot, so assets.8467 is assets; a dotted repo name needs its own root
-            return fold(config, Bucket(kind, below[0].split(".")[0] if below else "general"))
+            return fold(config, Bucket(root.kind, below[0].split(".")[0] if below else "general"))
     return None
 
 
