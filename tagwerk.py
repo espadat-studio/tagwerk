@@ -45,6 +45,7 @@ SENSORS = (("poll", ("focus",)), ("beat", ("beat",)), ("idle mark", ("idle", "ac
 CLAUDE_HOOKS_INSTALL = r"""jq -s '.[1].hooks as $add | .[0] | .hooks = reduce ($add | keys[]) as $k (.hooks // {}; .[$k] = ((.[$k] // []) + $add[$k] | unique))' \
   ~/.claude/settings.json /usr/share/tagwerk/claude-hooks.json > ~/.claude/settings.json.new \
   && mv ~/.claude/settings.json.new ~/.claude/settings.json"""
+CLAUDE_SETTINGS = "~/.claude/settings.json"
 PI_LINK = "~/.pi/agent/extensions/tagwerk.ts"
 PI_INSTALL = f"ln -s /usr/share/tagwerk/pi/tagwerk.ts {PI_LINK}"
 
@@ -620,12 +621,8 @@ def verdict(last: datetime | None, against: datetime | None, dark_after: timedel
     return "dark" if last is None or against - last > dark_after else "live"
 
 
-def claude_settings_path() -> Path:
-    return Path(os.environ.get("CLAUDE_CONFIG_DIR") or "~/.claude").expanduser() / "settings.json"
-
-
-def claude_hooks() -> tuple[str, str]:
-    path = claude_settings_path()
+def check_claude_hooks() -> tuple[str, str]:
+    path = Path(CLAUDE_SETTINGS).expanduser()
     try:
         settings = json.loads(path.read_text())
     except (OSError, ValueError):
@@ -636,7 +633,7 @@ def claude_hooks() -> tuple[str, str]:
     return ("wired", "") if "tagwerk beat" in json.dumps(hooks) else ("missing", CLAUDE_HOOKS_INSTALL)
 
 
-def pi_extension() -> tuple[str, str]:
+def check_pi_extension() -> tuple[str, str]:
     return ("wired", "") if Path(PI_LINK).expanduser().exists() else ("missing", PI_INSTALL)
 
 
@@ -655,7 +652,7 @@ def cmd_doctor(config: Config) -> int:
     for row in findings:
         line = f"{row.sensor:<{widths[0]}}  {row.when:<{widths[1]}}  {row.age:<{widths[2]}}  {row.verdict}"
         print(paint(line, RED) if row.verdict == "dark" else line)
-    pieces = [Wiring("claude hooks", *claude_hooks()), Wiring("pi extension", *pi_extension())]
+    pieces = [Wiring("claude hooks", *check_claude_hooks()), Wiring("pi extension", *check_pi_extension())]
     width = max(len(piece.name) for piece in pieces)
     print()
     for piece in pieces:

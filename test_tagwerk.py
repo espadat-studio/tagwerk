@@ -42,7 +42,7 @@ def data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 @pytest.fixture
 def home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setenv("HOME", str(tmp_path))
-    for name in ("XDG_CONFIG_HOME", "XDG_DATA_HOME", "TAGWERK_CONFIG", "TAGWERK_DATA_DIR", "CLAUDE_CONFIG_DIR"):
+    for name in ("XDG_CONFIG_HOME", "XDG_DATA_HOME", "TAGWERK_CONFIG", "TAGWERK_DATA_DIR"):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv("XDG_RUNTIME_DIR", str(tmp_path / "run"))
     monkeypatch.chdir(tmp_path)
@@ -1438,6 +1438,17 @@ def test_claude_hooks_fragment_beats_on_four_events_with_a_5s_timeout() -> None:
     assert hooks["PostToolUse"][0]["matcher"] == "*"
 
 
+def test_the_readme_documents_the_install_commands_doctor_prints() -> None:
+    readme = (SCRIPT.parent / "README.md").read_text()
+    assert f"```sh\n{tagwerk.CLAUDE_HOOKS_INSTALL}\n```" in readme
+    assert f"```sh\n{tagwerk.PI_INSTALL}\n```" in readme
+
+
+def test_each_install_command_targets_the_path_doctor_consults() -> None:
+    assert tagwerk.CLAUDE_SETTINGS in tagwerk.CLAUDE_HOOKS_INSTALL
+    assert tagwerk.PI_LINK in tagwerk.PI_INSTALL
+
+
 def test_pi_extension_spawns_tagwerk_by_absolute_path_on_four_events() -> None:
     text = (CONTRIB / "pi/tagwerk.ts").read_text()
     for event in ("session_start", "turn_start", "tool_execution_end", "agent_settled"):
@@ -1868,28 +1879,10 @@ def test_doctor_cannot_tell_when_the_claude_settings_hold_unexpected_json(
     assert notes(rows) == f"could not judge {home}/.claude/settings.json"
 
 
-def test_doctor_reads_the_claude_settings_from_claude_config_dir(
-    ledger: Path, home: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    live(ledger)
-    claude_settings(home, BARE)
-    elsewhere = home / "elsewhere"
-    elsewhere.mkdir()
-    (elsewhere / "settings.json").write_text(json.dumps(WIRED))
-    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(elsewhere))
-    assert per_piece(doctor(capsys, 0))["claude hooks"] == "wired"
-
-
 def test_doctor_keeps_its_exit_code_when_a_dark_sensor_meets_unwired_hooks(
     ledger: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     seed(ledger, mark(ago(minutes=2), "focus"), mark(ago(hours=2), "idle"))
     rows = doctor(capsys, 2)
     assert per_sensor(rows)["beat"] == ["never", "-", "dark"]
-    assert set(per_piece(rows).values()) == {"unknown", "missing"}
-
-
-def test_doctor_prints_the_install_commands_the_readme_documents() -> None:
-    readme = (SCRIPT.parent / "README.md").read_text()
-    assert f"```sh\n{tagwerk.CLAUDE_HOOKS_INSTALL}\n```" in readme
-    assert f"```sh\n{tagwerk.PI_INSTALL}\n```" in readme
+    assert per_piece(rows) == {"claude hooks": "unknown", "pi extension": "missing"}
