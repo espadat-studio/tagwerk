@@ -17,7 +17,7 @@ It answers two questions and no others — what goes on this month's invoice, an
 | Ledger       | `~/.local/share/tagwerk/YYYY-MM.jsonl`, append-only, UTC timestamps               |
 | Reports      | `day`, `week`, `month`, `invoice`; `fix` appends a span                           |
 
-Nothing in the ledger is ever edited. A correction is a new span appended after the fact, and the latest one wins.
+Nothing in the ledger is ever edited. A fix is a new span appended after the fact, and the latest one wins.
 
 ## How a minute is credited
 
@@ -28,6 +28,8 @@ An agent beat leases its repo for 10 minutes. A focused kitty cwd, or a window t
 With no lease, the focused window decides: a shell sitting at a root books that kind's `general`, a work-pattern title books `work/general`, and anything else books `personal/other`.
 
 Beats while idle book nothing, so an unattended overnight agent adds no hours.
+
+[Concepts](/concepts/) covers presence, the even split and the two catch-alls in full.
 
 ## Paid is not invoiced
 
@@ -51,3 +53,5 @@ systemctl --user enable --now tagwerk-idle.service tagwerk-focus.service
 ```
 
 tagwerk itself has no runtime dependencies and tracks master. The Claude Code hooks and the pi extension are part of that install, not an optional extra: without them a minute of background agent work is credited to the focused window instead of the agent's repo. `tagwerk doctor` reports one row per sensor — `live`, `dark` or `unknown` — so a missing hook is easy to tell apart from a repo outside your roots.
+
+[Installation](/getting-started/installation/) covers the units, the hypridle choice and the kitty remote-control requirement; [Verification](/getting-started/verification/) proves each sensor fires.

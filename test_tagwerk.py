@@ -18,6 +18,7 @@ import tagwerk
 
 SCRIPT = Path(tagwerk.__file__)
 CONTRIB = SCRIPT.parent / "contrib"
+DOCS = SCRIPT.parent / "docs/src/content/docs"
 T0 = datetime(2026, 8, 5, 10, 0, tzinfo=UTC)
 MINUTE = timedelta(minutes=1)
 Event = dict[str, Any]
@@ -1642,10 +1643,30 @@ def test_claude_hooks_fragment_beats_on_four_events_with_a_5s_timeout() -> None:
     assert hooks["PostToolUse"][0]["matcher"] == "*"
 
 
-def test_the_readme_documents_the_install_commands_doctor_prints() -> None:
-    readme = (SCRIPT.parent / "README.md").read_text()
-    assert f"```sh\n{tagwerk.CLAUDE_HOOKS_INSTALL}\n```" in readme
-    assert f"```sh\n{tagwerk.PI_INSTALL}\n```" in readme
+def test_the_site_documents_the_install_commands_doctor_prints() -> None:
+    page = (DOCS / "getting-started/agent-hooks.md").read_text()
+    assert f"```sh\n{tagwerk.CLAUDE_HOOKS_INSTALL}\n```" in page
+    assert f"```sh\n{tagwerk.PI_INSTALL}\n```" in page
+
+
+def test_the_config_page_lists_every_template_key_with_its_default() -> None:
+    scalars = tagwerk.CONFIG_TEMPLATE.split("[roots]")[0]
+    keys = re.findall(r"^(\w+) = (.+?)(?: #|$)", scalars, re.MULTILINE)
+    assert len(keys) == 10
+    rows = [row for row in (DOCS / "configuration.md").read_text().splitlines() if row.startswith("|")]
+    for key, raw in keys:
+        default = raw.strip().strip('"')
+        assert any(f"`{key}`" in row and f"`{default}`" in row for row in rows), f"{key} = {default}"
+
+
+def test_the_cli_reference_documents_every_subcommand(capsys: pytest.CaptureFixture[str]) -> None:
+    with pytest.raises(SystemExit):
+        tagwerk.main(["--help"])
+    choices = re.search(r"\{([a-z,\-]+)\}", capsys.readouterr().out)
+    assert choices
+    page = (DOCS / "cli-reference.md").read_text()
+    for command in choices.group(1).split(","):
+        assert f"tagwerk {command}" in page, command
 
 
 def test_each_install_command_targets_the_path_doctor_consults() -> None:

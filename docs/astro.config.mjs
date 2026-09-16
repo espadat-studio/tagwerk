@@ -20,6 +20,21 @@ export default defineConfig({
       ],
       sidebar: [
         { label: "Home", link: "/" },
+        {
+          label: "Getting Started",
+          items: [
+            { slug: "getting-started/installation" },
+            { slug: "getting-started/agent-hooks" },
+            { slug: "getting-started/verification" },
+          ],
+        },
+        { slug: "concepts" },
+        { slug: "configuration" },
+        { slug: "cli-reference" },
+        { slug: "bar-widget" },
+        { slug: "troubleshooting" },
+        { slug: "migration" },
+        { slug: "development" },
       ],
     }),
   ],
