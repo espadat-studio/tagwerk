@@ -12,6 +12,7 @@ Passive work-hours ledger for one Linux desktop running Hyprland, kitty and Omar
 | Ledger       | `~/.local/share/tagwerk/YYYY-MM.jsonl`, append-only, UTC timestamps                                  |
 | Attribution  | a present minute is split evenly across leased repos, else the ambient bucket, else `personal/other` |
 | Reports      | `day`, `week`, `month`, `invoice`; `fix` appends a span                                              |
+| Bar widget   | an Omarchy plugin drawing today's credited hours against the day cap, from `tagwerk day --json`      |
 
 Documentation: [tagwerk.espadat.com](https://tagwerk.espadat.com). Vocabulary: `CONTEXT.md`. Decisions with their trade-offs: `meta/adr/`. Spec and tickets: [issue #4](https://github.com/espadat-studio/tagwerk/issues/4).
 
@@ -93,6 +94,30 @@ Exit codes let a shell prompt or a timer alarm on wiring without a suspect patte
 |    3 | every sensor live, but the config is suspect       |
 
 A dark row names what to fix. A dark `poll` is the focus poller: check `systemctl --user status tagwerk-focus.service` and `journalctl --user -u tagwerk-focus.service`; systemd restarts it after 5 s. A dark `idle mark` is `tagwerk-idle.service`, or hypridle running your own config without the `tagwerk idle` and `tagwerk active` lines. A dark `beat` means the agent hooks above never landed, or every turn ran outside your `[roots]`: `tagwerk beat` drops a cwd it cannot resolve and exits 0, so nothing else reports it. The wiring rows tell the two apart: a `missing` row is the install you still owe, two `wired` rows point at `[roots]`.
+
+## Omarchy bar widget
+
+A cap-proximity cue for the bar, answering one question: am I close to the day cap, or not? A track, a fill running to today's credited minutes with the paid stretch solid inside it, and the cap as a notch you watch the fill close on. One glance, no arithmetic, nothing to read.
+
+```sh
+cp -r /usr/share/tagwerk/omarchy ~/.config/omarchy/plugins/espadat.tagwerk
+omarchy-shell shell rescanPlugins
+omarchy plugin enable espadat.tagwerk
+```
+
+| What you see                                                                                                                                                                                                                                      | What it is                                                                                                                                                                                                                                          |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| <picture><source media="(prefers-color-scheme: dark)" srcset=".github/assets/widget-empty-dark.png"><img alt="an empty track with the cap notched near its right end" src=".github/assets/widget-empty-light.png" width="192"></picture>          | An empty day. The track spans the cap times 1.25, so 10 hours across 40px at an 8-hour cap: 4px per hour, and 30 minutes is 2px. The notch is the cap, always at 80%.                                                                               |
+| <picture><source media="(prefers-color-scheme: dark)" srcset=".github/assets/widget-personal-dark.png"><img alt="a translucent fill reaching halfway along the track" src=".github/assets/widget-personal-light.png" width="192"></picture>       | 5:00 credited, none of it paid. The translucent fill is every credited minute, `total_minutes`.                                                                                                                                                     |
+| <picture><source media="(prefers-color-scheme: dark)" srcset=".github/assets/widget-split-dark.png"><img alt="a solid fill, then a translucent one, ending short of the notch" src=".github/assets/widget-split-light.png" width="192"></picture> | 7:20 credited, 5:10 of it paid. The solid stretch is `paid_minutes`; the gap between the two edges is personal.                                                                                                                                     |
+| <picture><source media="(prefers-color-scheme: dark)" srcset=".github/assets/widget-atcap-dark.png"><img alt="the fill reaching the notch, which still cuts through it" src=".github/assets/widget-atcap-light.png" width="192"></picture>        | 8:00 credited, exactly on the cap. The fill stops flush against the notch, because the cap sits at 80% of a track that runs to 125% of it.                                                                                                          |
+| <picture><source media="(prefers-color-scheme: dark)" srcset=".github/assets/widget-over-dark.png"><img alt="a red fill running past the notch" src=".github/assets/widget-over-light.png" width="192"></picture>                                 | 9:00 credited, `over_cap`. Both segments switch to the theme's urgent colour and the notch does not, so the hour past the cap stays readable: the notch is painted above the fill. There is no approaching colour — proximity is the fill's length. |
+
+Hover prints work, personal, presence, and the time left or over. Click opens `tagwerk week` in the themed floating terminal. The widget lands on the right of the bar; `omarchy bar move espadat.tagwerk` relocates it.
+
+It runs `tagwerk day --json` every 300 s and draws four rectangles. Nothing else: it never reads the ledger, never reads your config, and never re-implements the cap rule — `over_cap` arrives already computed (ADR-0011). Change `refreshIntervalSec` in the widget's settings; below 15 minutes the fill moves less than a pixel, so the interval buys the notch crossing and nothing more.
+
+A copy, not a symlink: `omarchy plugin validate` refuses any symlink inside a plugin folder, so a linked install cannot be checked. The directory name must equal the manifest id, because that is how the shell maps a changed file back to its plugin. Re-copy after a `tagwerk-git` update; the shell hot-reloads the widget on the write.
 
 ## Migrating from timewarrior
 
@@ -187,6 +212,8 @@ Both flags go before the subcommand. Reports colour only when both stdout and st
 - `doctor` tests each `[[title]]` pattern against every title on its own, so a pattern permanently shadowed by an earlier one still reads clear. Attribution takes the first match, and replaying that order across the whole ledger would cost more than the typo it would catch.
 - Exit 2 is shared: argparse spends it on a usage error, so `tagwerk doctor --bogus` alarms a prompt exactly as a dark sensor does.
 - `day --json` judges `over_cap` on the whole minutes it prints, while the `week` bar reddens on the raw total. A day landing within half a minute of the cap can read over in one and under in the other; self-consistent JSON was worth more than agreement at that boundary.
+- The bar widget notches the day cap alone. `week_cap_h` is arguably the better burnout signal, but `--json` is `day` alone, so a 38-hour week reads quiet there on Friday morning.
+- The widget redraws on a timer, so it trails the true minute by up to `refreshIntervalSec` — 300 s by default, which is a fifth of a pixel of fill.
 - One machine, no web UI, no sync, no notifications. `--json` is `day` alone; every other report is text for a human to read.
 
 ## Development
