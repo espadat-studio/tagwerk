@@ -725,8 +725,9 @@ def day_json(capsys: pytest.CaptureFixture[str], *argv: str) -> dict[str, Any]:
     return parsed
 
 
-def cap_hours(data_dir: Path, tmp_path: Path, day_cap_h: float) -> None:
-    (tmp_path / "config.toml").write_text(f'data_dir = "{data_dir}"\nday_cap_h = {day_cap_h}\n')
+def set_day_cap(tmp_path: Path, hours: float) -> None:
+    config = tmp_path / "config.toml"
+    config.write_text(f"{config.read_text()}day_cap_h = {hours}\n")
 
 
 def test_day_json_carries_the_buckets_subtotals_cap_and_verdict(
@@ -767,7 +768,7 @@ def test_day_json_figures_equal_the_same_runs_table(data_dir: Path, capsys: pyte
 def test_day_json_is_over_cap_only_above_the_cap(
     data_dir: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str], end: str, total: int, over: bool
 ) -> None:
-    cap_hours(data_dir, tmp_path, 4)
+    set_day_cap(tmp_path, 4)
     run(capsys, "fix", "09:00", end, "assets")
     parsed = day_json(capsys)
     assert (parsed["cap_minutes"], parsed["total_minutes"], parsed["over_cap"]) == (240, total, over)
@@ -776,10 +777,25 @@ def test_day_json_is_over_cap_only_above_the_cap(
 def test_day_json_crosses_the_cap_on_personal_minutes_alone(
     data_dir: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    cap_hours(data_dir, tmp_path, 4)
+    set_day_cap(tmp_path, 4)
     run(capsys, "fix", "09:00", "14:00", "auberge", "--kind", "personal")
     parsed = day_json(capsys)
     assert (parsed["paid_minutes"], parsed["total_minutes"], parsed["over_cap"]) == (0, 300, True)
+
+
+def test_day_json_buckets_round_one_by_one_so_they_need_not_sum_to_the_total(
+    home: Path, ledger: Path, berlin: None, capsys: pytest.CaptureFixture[str]
+) -> None:
+    seed(ledger, *present(T0, 9), beat(T0, f"{home}/code/work-org/assets"), beat(T0, f"{home}/code/work-org/checkout"))
+    parsed = day_json(capsys, "2026-08-05")
+    assert [bucket["minutes"] for bucket in parsed["buckets"]] == [4, 4]
+    assert (parsed["paid_minutes"], parsed["total_minutes"]) == (9, 9)
+    assert run(capsys, "day", "2026-08-05") == [
+        ["work/assets", "0:04"],
+        ["work/checkout", "0:04"],
+        ["work", "0:09"],
+        ["total", "0:09"],
+    ]
 
 
 def test_day_json_for_an_empty_day_has_no_buckets_and_zero_subtotals(
