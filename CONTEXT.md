@@ -35,8 +35,12 @@ A sensor that has appended recently enough, measured against the most recent pol
 _Avoid_: healthy, up, ok, green
 
 **Unknown**:
-A sensor whose silence cannot be judged, because no poll proves the machine was ever on. Never a fault in itself: an empty ledger says nothing about wiring.
+A verdict tagwerk cannot reach: a sensor whose silence cannot be judged, because no poll proves the machine was ever on, or a piece of wiring whose settings file it cannot read. Never a fault in itself, and never a false failure standing in for one.
 _Avoid_: unchecked, n/a, no data
+
+**Wiring**:
+The installed path by which a sensor reaches the ledger: a Claude Code hook that runs `tagwerk beat`, the pi extension symlink. Each piece reads **wired** when it is installed and **missing** when it is not. A missing piece explains a dark sensor; it is never an alarm of its own.
+_Avoid_: setup, integration, plumbing
 
 **Span**:
 A manually entered or imported interval that overrides the sensors for its whole range. The latest appended span wins on overlap.

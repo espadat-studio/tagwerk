@@ -42,6 +42,12 @@ PALETTE = (166, 36, 176, 61, 142)
 
 CATCH_ALLS = ("general", "other")
 SENSORS = (("poll", ("focus",)), ("beat", ("beat",)), ("idle mark", ("idle", "active")))
+CLAUDE_HOOKS_INSTALL = r"""jq -s '.[1].hooks as $add | .[0] | .hooks = reduce ($add | keys[]) as $k (.hooks // {}; .[$k] = ((.[$k] // []) + $add[$k] | unique))' \
+  ~/.claude/settings.json /usr/share/tagwerk/claude-hooks.json > ~/.claude/settings.json.new \
+  && mv ~/.claude/settings.json.new ~/.claude/settings.json"""
+CLAUDE_SETTINGS = "~/.claude/settings.json"
+PI_LINK = "~/.pi/agent/extensions/tagwerk.ts"
+PI_INSTALL = f"ln -s /usr/share/tagwerk/pi/tagwerk.ts {PI_LINK}"
 
 
 class Bucket(NamedTuple):
@@ -58,6 +64,12 @@ class Finding(NamedTuple):
     when: str
     age: str
     verdict: str
+
+
+class Wiring(NamedTuple):
+    name: str
+    verdict: str
+    note: str
 
 
 OTHER = Bucket("personal", "other")
@@ -609,6 +621,22 @@ def verdict(last: datetime | None, against: datetime | None, dark_after: timedel
     return "dark" if last is None or against - last > dark_after else "live"
 
 
+def check_claude_hooks() -> tuple[str, str]:
+    path = Path(CLAUDE_SETTINGS).expanduser()
+    try:
+        settings = json.loads(path.read_text())
+    except (OSError, ValueError):
+        settings = None
+    if not isinstance(settings, dict) or not isinstance(hooks := settings.get("hooks", {}), dict):
+        return "unknown", f"could not judge {path}"
+    # ponytail: any mention of the command counts as wired, so a hook that merely names it in an echo would fool this
+    return ("wired", "") if "tagwerk beat" in json.dumps(hooks) else ("missing", CLAUDE_HOOKS_INSTALL)
+
+
+def check_pi_extension() -> tuple[str, str]:
+    return ("wired", "") if Path(PI_LINK).expanduser().exists() else ("missing", PI_INSTALL)
+
+
 def cmd_doctor(config: Config) -> int:
     seen = last_seen(config.data_dir)
     now = datetime.now(UTC)
@@ -624,6 +652,13 @@ def cmd_doctor(config: Config) -> int:
     for row in findings:
         line = f"{row.sensor:<{widths[0]}}  {row.when:<{widths[1]}}  {row.age:<{widths[2]}}  {row.verdict}"
         print(paint(line, RED) if row.verdict == "dark" else line)
+    pieces = [Wiring("claude hooks", *check_claude_hooks()), Wiring("pi extension", *check_pi_extension())]
+    width = max(len(piece.name) for piece in pieces)
+    print()
+    for piece in pieces:
+        print(f"{piece.name:<{width}}  {piece.verdict}")
+        for note in piece.note.splitlines():
+            print(f"  {note}")
     return 2 if any(row.verdict == "dark" for row in findings) else 0
 
 
@@ -693,7 +728,8 @@ def main(argv: list[str]) -> int:
     commands.add_parser(
         "doctor",
         parents=[plain],
-        help="one row per sensor with its last event and verdict; exits 2 when any sensor is dark",
+        help="one row per sensor with its last event and verdict, then the agent hook wiring; "
+        "exits 2 when any sensor is dark",
     )
     commands.add_parser("idle", help="mark the start of idle, from the hypridle listener or before sleep")
     commands.add_parser("active", help="mark the end of idle, from the hypridle listener or after sleep")
