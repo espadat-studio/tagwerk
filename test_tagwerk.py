@@ -18,6 +18,7 @@ import tagwerk
 
 SCRIPT = Path(tagwerk.__file__)
 CONTRIB = SCRIPT.parent / "contrib"
+DOCS = SCRIPT.parent / "docs/src/content/docs"
 T0 = datetime(2026, 8, 5, 10, 0, tzinfo=UTC)
 MINUTE = timedelta(minutes=1)
 Event = dict[str, Any]
@@ -1642,10 +1643,10 @@ def test_claude_hooks_fragment_beats_on_four_events_with_a_5s_timeout() -> None:
     assert hooks["PostToolUse"][0]["matcher"] == "*"
 
 
-def test_the_readme_documents_the_install_commands_doctor_prints() -> None:
-    readme = (SCRIPT.parent / "README.md").read_text()
-    assert f"```sh\n{tagwerk.CLAUDE_HOOKS_INSTALL}\n```" in readme
-    assert f"```sh\n{tagwerk.PI_INSTALL}\n```" in readme
+def test_the_site_documents_the_install_commands_doctor_prints() -> None:
+    page = (DOCS / "getting-started/agent-hooks.md").read_text()
+    assert f"```sh\n{tagwerk.CLAUDE_HOOKS_INSTALL}\n```" in page
+    assert f"```sh\n{tagwerk.PI_INSTALL}\n```" in page
 
 
 def test_each_install_command_targets_the_path_doctor_consults() -> None:

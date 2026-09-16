@@ -26,7 +26,9 @@ tagwerk init && $EDITOR ~/.config/tagwerk/config.toml
 systemctl --user enable --now tagwerk-idle.service tagwerk-focus.service
 ```
 
-Any AUR helper works: `yay -S tagwerk-git`. Without one, `git clone https://aur.archlinux.org/tagwerk-git.git && cd tagwerk-git && makepkg -si` builds the package and installs it through pacman.
+The agent hooks are part of that install, not an optional extra: without them a present minute of background agent work is credited to the focused window instead of the agent's repo. [Getting started](https://tagwerk.espadat.com/getting-started/installation/) covers the units, the hypridle choice, the kitty remote-control requirement, the agent hooks and the verification steps that prove each sensor fires.
+
+## Configuration
 
 In the config, point `[roots]` at your work org's clone directory as `work` and at your personal code directory as `personal`. A fixed-price customer's directory is `fixed`: paid, so it counts toward the week cap, but never on the hourly customer's invoice. Make the `[[title]]` patterns match your org's GitHub titles and chat apps. A rule that cannot work is rejected when the config loads, named by its position and its pattern: no `pattern`, no `kind`, a `pattern` that is no regex, or nothing to name the project with. The longest root wins. The project is the first directory below the root, cut at its first dot, so `assets.8467` and `assets` are one project. Every other key ships with its default; the comments in the file `tagwerk init` writes explain each one.
 
@@ -38,62 +40,6 @@ In the config, point `[roots]` at your work org's clone directory as `work` and 
 | `off`      |             no             |       no       |
 
 The day cap asks a different question and no kind answers it: it counts every credited minute, `personal` included (ADR-0011). A kind never names the payer. `off` belongs to a span, not to a root or a title rule: the config rejects it there, and `tagwerk fix --kind off` books it.
-
-Omarchy's shell already runs the screensaver at 150 s and the lock at 300 s, so `tagwerk-idle.service` runs hypridle on the packaged `/usr/share/tagwerk/hypridle.conf`, which only feeds the ledger. Its listener fires at the same 150 s without input and no minutes fall between screensaver and lock. If you already run `hypridle.service` with your own config, add its `tagwerk idle` and `tagwerk active` lines there and skip `tagwerk-idle.service`.
-
-The poller reads the kitty cwd over kitty remote control on Omarchy's per-pid socket. `/etc/xdg/kitty/kitty.conf` already sets `allow_remote_control socket-only` and `listen_on`; a user `kitty.conf` must not override them. A kitty started outside Omarchy's config has no socket; its cwd is written as `null` and the poller keeps running.
-
-The [agent hooks](#agent-hooks) below are part of the install: without them a present minute of background agent work is credited to the focused window instead of the agent's repo.
-
-## Agent hooks
-
-Claude Code:
-
-```sh
-jq -s '.[1].hooks as $add | .[0] | .hooks = reduce ($add | keys[]) as $k (.hooks // {}; .[$k] = ((.[$k] // []) + $add[$k] | unique))' \
-  ~/.claude/settings.json /usr/share/tagwerk/claude-hooks.json > ~/.claude/settings.json.new \
-  && mv ~/.claude/settings.json.new ~/.claude/settings.json
-```
-
-`claude-hooks.json` adds `SessionStart`, `UserPromptSubmit`, `PostToolUse` and `Stop` hooks with 5 s timeouts. The jq line appends them to the hooks the settings already hold and is safe to rerun. `PostToolUse` is not optional: without it a 20 min agentic turn loses minutes 10 to 20 once the beat lease runs out.
-
-pi:
-
-```sh
-ln -s /usr/share/tagwerk/pi/tagwerk.ts ~/.pi/agent/extensions/tagwerk.ts
-```
-
-pi runs under Bun with its own `PATH`, so the extension spawns `/usr/bin/tagwerk` by absolute path. Restart pi to load it.
-
-Both installs fail quietly, which is how this ledger went six months without a single beat. `tagwerk doctor` confirms they landed: it reports each piece as `wired` or `missing`, and reprints the command above for whichever is missing.
-
-## Verify
-
-After 10 minutes with a kitty window focused for part of them, and one agent turn:
-
-```sh
-tagwerk doctor
-tagwerk day
-```
-
-`doctor` prints one row per sensor with when it last appended and a verdict. Three `live` rows mean the poller, the agent hooks and the idle listener all reach the ledger, and `day` lists the repo you were in. A row reads `unknown` when no poll proves the machine was ever on, so there is nothing to measure that sensor's silence against.
-
-Below the sensors, `doctor` reports the two [agent hook](#agent-hooks) installs: `wired`, `missing` with the command to type, or `unknown` when it cannot read `~/.claude/settings.json`. The settings schema is Anthropic's, so a file that is absent, unreadable or shaped unexpectedly reads `unknown` rather than a false `missing`. Wiring is advisory and never changes the exit code.
-
-Last, `doctor` lists config that cannot be doing anything: a root that is no directory on disk, and a `[[title]]` pattern that no title in the ledger ever matched. Both read `suspect`, never dark — a root may sit on an unmounted drive, and a pattern may simply describe an app you have not opened. Each row names the path or pattern as your config wrote it, so you can grep for the line, and says where the minutes go instead.
-
-A config straight from `tagwerk init` reads suspect in every root and pattern until you edit it, because the template names an org that is not yours. That is the check working, not a fault, and it is why `tagwerk init && $EDITOR ~/.config/tagwerk/config.toml` is one command in the install.
-
-Exit codes let a shell prompt or a timer alarm on wiring without a suspect pattern lighting it up:
-
-| Code | Means                                              |
-| ---: | -------------------------------------------------- |
-|    0 | every sensor live and no suspect config            |
-|    1 | tagwerk itself failed                              |
-|    2 | at least one sensor dark, whatever the config says |
-|    3 | every sensor live, but the config is suspect       |
-
-A dark row names what to fix. A dark `poll` is the focus poller: check `systemctl --user status tagwerk-focus.service` and `journalctl --user -u tagwerk-focus.service`; systemd restarts it after 5 s. A dark `idle mark` is `tagwerk-idle.service`, or hypridle running your own config without the `tagwerk idle` and `tagwerk active` lines. A dark `beat` means the agent hooks above never landed, or every turn ran outside your `[roots]`: `tagwerk beat` drops a cwd it cannot resolve and exits 0, so nothing else reports it. The wiring rows tell the two apart: a `missing` row is the install you still owe, two `wired` rows point at `[roots]`.
 
 ## Omarchy bar widget
 

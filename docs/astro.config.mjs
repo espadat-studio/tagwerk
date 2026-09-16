@@ -20,6 +20,14 @@ export default defineConfig({
       ],
       sidebar: [
         { label: "Home", link: "/" },
+        {
+          label: "Getting Started",
+          items: [
+            { slug: "getting-started/installation" },
+            { slug: "getting-started/agent-hooks" },
+            { slug: "getting-started/verification" },
+          ],
+        },
       ],
     }),
   ],
