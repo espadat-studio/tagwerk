@@ -3,7 +3,7 @@ title: Installation
 description: Install tagwerk from the AUR, enable the units, and wire hypridle and the agent hooks.
 ---
 
-Target: Omarchy 4 with Hyprland and kitty. The [AUR package](https://aur.archlinux.org/packages/tagwerk-git) pulls `hypridle` and the system Python; tagwerk itself has no runtime dependencies (ADR-0004) and tracks master (ADR-0005).
+Built and tested on Omarchy 4; any Arch Hyprland works, with [kitty remote control](#kitty-remote-control) as the one piece Omarchy configures for you. The [AUR package](https://aur.archlinux.org/packages/tagwerk-git) pulls `hypridle` and the system Python; tagwerk itself has no runtime dependencies (ADR-0004) and tracks master (ADR-0005).
 
 ```sh
 paru -S tagwerk-git

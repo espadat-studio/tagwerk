@@ -6,7 +6,7 @@ export default defineConfig({
   integrations: [
     starlight({
       title: "tagwerk",
-      description: "Passive time tracker for Hyprland, nothing to start or stop. Every present minute books to a project, from your terminal's repo, your Claude Code or pi agent's repo, or the focused window, so a Slack thread or a Zoom call counts as work too.",
+      description: "Passive time tracker for Hyprland on Arch, nothing to start or stop. Every present minute books to a project: the repo under your kitty terminal, the repo your Claude Code or pi agent works in, or what the focused window implies, so a Slack thread or a Zoom call counts as work too. Built on Omarchy 4.",
       logo: { src: "./src/assets/mark.svg", alt: "Espadat" },
       head: [{ tag: "link", attrs: { rel: "icon", href: "/favicon.ico", sizes: "16x16 32x32" } }],
       customCss: ["@espadat/docs-theme/styles/theme.css"],

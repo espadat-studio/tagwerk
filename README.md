@@ -2,9 +2,9 @@
 
 [![AUR](https://img.shields.io/aur/version/tagwerk-git?label=AUR&color=1793d1)](https://aur.archlinux.org/packages/tagwerk-git)
 
-> Work hours that track themselves, whether you were in a repo, a Slack thread or a Zoom call, with your coding agents' time counted too.
+> Work hours that track themselves on a Hyprland desktop, whether you were in a repo, a Slack thread or a Zoom call, with your coding agents' time counted too.
 
-Every CLI time tracker is manual, and manual discipline is what killed the timewarrior setup this one replaces: a forgotten start, a forgotten stop. tagwerk has no start and no stop. On Hyprland it watches which repo your terminal or coding agent sits in, which window has focus, and whether you are idle, then credits every present minute to a project. A repo takes the minute while one is active. Otherwise the focused window decides, so a Slack thread or a Zoom call books to work and an unrecognised window to personal. It answers two questions and no others: what goes on this month's invoice, and whether last week was too long a week.
+Every CLI time tracker is manual, and manual discipline is what killed the timewarrior setup this one replaces: a forgotten start, a forgotten stop. tagwerk has no start and no stop. On Hyprland it watches which repo your kitty terminal or coding agent sits in, which window has focus, and whether you are idle, then credits every present minute to a project. A repo takes the minute while one is active. Otherwise the focused window decides, so a Slack thread or a Zoom call books to work and an unrecognised window to personal. It answers two questions and no others: what goes on this month's invoice, and whether last week was too long a week.
 
 | Piece        | What it does                                                                                                                                                                            |
 | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -43,7 +43,7 @@ Full documentation lives at [tagwerk.espadat.com](https://tagwerk.espadat.com):
 
 ## Requirements
 
-Omarchy 4 with Hyprland and kitty. The AUR package pulls `hypridle` and the system Python; tagwerk itself has no runtime dependencies (ADR-0004) and tracks master (ADR-0005).
+Built and tested on Omarchy 4. Any Arch Hyprland works: the AUR package pulls `hypridle` and the system Python, and tagwerk itself has no runtime dependencies (ADR-0004) and tracks master (ADR-0005). The terminal sensor needs kitty with remote control on, which Omarchy configures and `kitty_socket` points at. The bar widget is Omarchy only.
 
 ## This repo
 

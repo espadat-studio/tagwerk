@@ -1,11 +1,11 @@
 ---
 title: tagwerk
-description: "Passive time tracker for Hyprland, nothing to start or stop. Every present minute books to a project, from your terminal's repo, your Claude Code or pi agent's repo, or the focused window, so a Slack thread or a Zoom call counts as work too."
+description: "Passive time tracker for Hyprland on Arch, nothing to start or stop. Every present minute books to a project: the repo under your kitty terminal, the repo your Claude Code or pi agent works in, or what the focused window implies, so a Slack thread or a Zoom call counts as work too. Built on Omarchy 4."
 ---
 
-> Work hours that track themselves, whether you were in a repo, a Slack thread or a Zoom call, with your coding agents' time counted too.
+> Work hours that track themselves on a Hyprland desktop, whether you were in a repo, a Slack thread or a Zoom call, with your coding agents' time counted too.
 
-Every CLI time tracker is manual, and manual discipline is what killed the timewarrior setup this one replaces: a forgotten start, a forgotten stop. tagwerk has no start and no stop. On Hyprland it watches which repo your terminal or coding agent sits in, which window has focus, and whether you are idle, then credits every present minute to a project. A repo takes the minute while one is active. Otherwise the focused window decides, so a Slack thread or a Zoom call books to work and an unrecognised window to personal. It answers two questions and no others: what goes on this month's invoice, and whether last week was too long a week.
+Every CLI time tracker is manual, and manual discipline is what killed the timewarrior setup this one replaces: a forgotten start, a forgotten stop. tagwerk has no start and no stop. On Hyprland it watches which repo your kitty terminal or coding agent sits in, which window has focus, and whether you are idle, then credits every present minute to a project. A repo takes the minute while one is active. Otherwise the focused window decides, so a Slack thread or a Zoom call books to work and an unrecognised window to personal. It answers two questions and no others: what goes on this month's invoice, and whether last week was too long a week.
 
 ## Where the minutes come from
 
@@ -52,6 +52,6 @@ tagwerk init && $EDITOR ~/.config/tagwerk/config.toml
 systemctl --user enable --now tagwerk-idle.service tagwerk-focus.service
 ```
 
-tagwerk itself has no runtime dependencies and tracks master. The Claude Code hooks and the pi extension are part of that install, not an optional extra: without them a minute of background agent work is credited to the focused window instead of the agent's repo. `tagwerk doctor` reports one row per sensor — `live`, `dark` or `unknown` — so a missing hook is easy to tell apart from a repo outside your roots.
+tagwerk itself has no runtime dependencies and tracks master. It is built and tested on Omarchy 4; any Arch Hyprland works once kitty has remote control on for the terminal sensor, and the bar widget is Omarchy only. The Claude Code hooks and the pi extension are part of that install, not an optional extra: without them a minute of background agent work is credited to the focused window instead of the agent's repo. `tagwerk doctor` reports one row per sensor — `live`, `dark` or `unknown` — so a missing hook is easy to tell apart from a repo outside your roots.
 
 [Installation](/getting-started/installation/) covers the units, the hypridle choice and the kitty remote-control requirement; [Verification](/getting-started/verification/) proves each sensor fires.
