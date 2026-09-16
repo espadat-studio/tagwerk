@@ -2,7 +2,7 @@
 pkgname=tagwerk-git
 pkgver=r18.06781b3
 pkgrel=1
-pkgdesc="Passive per-repo time tracker for Hyprland, nothing to start or stop"
+pkgdesc="Passive time tracker for Hyprland, nothing to start or stop"
 arch=(any)
 url="https://github.com/espadat-studio/tagwerk"
 license=(AGPL-3.0-or-later)

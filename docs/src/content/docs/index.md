@@ -1,11 +1,11 @@
 ---
 title: tagwerk
-description: "Passive per-repo time tracker for Hyprland. Nothing to start or stop: it credits minutes from the focused window, the terminal cwd and Claude Code or pi agent hooks."
+description: "Passive time tracker for Hyprland, nothing to start or stop. Every present minute books to a project, from your terminal's repo, your Claude Code or pi agent's repo, or the focused window, so a Slack thread or a Zoom call counts as work too."
 ---
 
-> Work hours that track themselves, per repo, with your coding agents' time counted too.
+> Work hours that track themselves, whether you were in a repo, a Slack thread or a Zoom call, with your coding agents' time counted too.
 
-Every CLI time tracker is manual, and manual discipline is what killed the timewarrior setup this one replaces: a forgotten start, a forgotten stop. tagwerk has no start and no stop. On Hyprland it watches which window has focus, which repo your terminal or coding agent sits in, and whether you are idle, then credits every present minute to a project. It answers two questions and no others: what goes on this month's invoice, and whether last week was too long a week.
+Every CLI time tracker is manual, and manual discipline is what killed the timewarrior setup this one replaces: a forgotten start, a forgotten stop. tagwerk has no start and no stop. On Hyprland it watches which repo your terminal or coding agent sits in, which window has focus, and whether you are idle, then credits every present minute to a project. A repo takes the minute while one is active. Otherwise the focused window decides, so a Slack thread or a Zoom call books to work and an unrecognised window to personal. It answers two questions and no others: what goes on this month's invoice, and whether last week was too long a week.
 
 ## Where the minutes come from
 
