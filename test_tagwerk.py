@@ -2081,10 +2081,10 @@ def wired_agents(home: Path) -> None:
     link_pi(home)
 
 
-def live(bare_ledger: Path) -> None:
+def live(bare_ledger: Path, *polls: Event) -> None:
     seed(
         bare_ledger,
-        poll(ago(minutes=2)),
+        *(polls or (poll(ago(minutes=2), cwd="~/code/blog"),)),
         beat(ago(hours=3), "~/code/blog"),
         beat(ago(hours=4), "~/code/blog", "pi"),
         mark(ago(hours=5), "idle"),
@@ -2123,7 +2123,7 @@ def test_doctor_calls_one_agent_dark_while_the_other_still_beats(
 def test_doctor_makes_no_darkness_claim_for_an_unwired_agent(
     bare_ledger: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    seed(bare_ledger, poll(ago(minutes=2)), mark(ago(hours=2), "active"))
+    seed(bare_ledger, poll(ago(minutes=2), cwd="~/code/blog"), mark(ago(hours=2), "active"))
     rows = per_sensor(doctor(capsys, 0))
     assert [rows["beat claude"][-1], rows["beat pi"][-1]] == ["unknown", "unknown"]
 
@@ -2372,6 +2372,38 @@ def test_doctor_skips_a_focus_event_that_carries_no_title_instead_of_dying_on_it
     untitled: Event = {"ts": stamp(ago(minutes=5)), "ev": "focus", "class": "x", "cwd": None}
     live_with(home, monkeypatch, ZOOM_TITLE, poll(ago(minutes=4), title=None), untitled)
     assert blocks(doctor(capsys, 3))[2][0].startswith(r"title '(?i)zoom|meet\.google'")
+
+
+def test_doctor_calls_a_poller_that_carried_no_cwd_suspect(
+    home: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    live(configured_ledger(home, monkeypatch, ""), poll(ago(minutes=2)))
+    (row,) = blocks(doctor(capsys, 3))[2]
+    assert row.startswith("cwd source")
+    assert row.endswith("suspect")
+    assert "no terminal was opened" in row
+
+
+def test_doctor_clears_the_cwd_row_when_a_recent_poll_carried_one(
+    home: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    live(configured_ledger(home, monkeypatch, ""), poll(ago(minutes=3), cwd="~/code/blog"), poll(ago(minutes=2)))
+    assert len(blocks(doctor(capsys, 0))) == 2
+
+
+def test_doctor_calls_the_poller_blind_when_only_a_poll_beyond_poll_dark_carried_a_cwd(
+    home: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    live(configured_ledger(home, monkeypatch, ""), poll(ago(days=30), cwd="~/code/blog"), poll(ago(minutes=2)))
+    (row,) = blocks(doctor(capsys, 3))[2]
+    assert row.startswith("cwd source")
+
+
+def test_doctor_stays_silent_about_cwd_when_the_poller_is_already_dark(
+    home: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    live(configured_ledger(home, monkeypatch, ""), poll(ago(days=30)))
+    assert len(blocks(doctor(capsys, 2))) == 2
 
 
 def test_doctor_reads_every_entry_of_an_unedited_config_template_as_suspect(

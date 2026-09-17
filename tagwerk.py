@@ -46,6 +46,7 @@ PALETTE = (166, 36, 176, 61, 142)
 CATCH_ALLS = ("general", "other")
 ROOT_GONE = "no such directory; its minutes book to a shorter root or personal/other"
 TITLE_UNMATCHED = "no ledger title matched; either the app never ran or it books elsewhere"
+CWD_BLIND = "no poll carried a cwd; no terminal minute can reach a repo, or no terminal was opened"
 CLAUDE_HOOKS_INSTALL = r"""jq -s '.[1].hooks as $add | .[0] | .hooks = reduce ($add | keys[]) as $k (.hooks // {}; .[$k] = ((.[$k] // []) + $add[$k] | unique))' \
   ~/.claude/settings.json /usr/share/tagwerk/claude-hooks.json > ~/.claude/settings.json.new \
   && mv ~/.claude/settings.json.new ~/.claude/settings.json"""
@@ -755,11 +756,21 @@ def sensor_rows(config: Config, seen: dict[str, datetime], wired: set[str], now:
     return rows
 
 
-def suspect_rows(config: Config, titles: set[str]) -> list[tuple[str, str, str]]:
+def cwd_blind(config: Config, events: list[Event], now: datetime) -> bool:
+    # a poll older than poll_dark cannot judge this; a dark poll sensor already explains a cwd that never arrives
+    polls = [event for event in events if event["ev"] == "focus"]
+    recent = [poll for poll in polls if now - datetime.fromisoformat(poll["ts"]) <= config.poll_dark]
+    return bool(recent) and not any(poll.get("cwd") for poll in recent)
+
+
+def suspect_rows(config: Config, titles: set[str], events: list[Event], now: datetime) -> list[tuple[str, str, str]]:
     # ponytail: is_dir sees an unmounted drive as a typo; advisory only, so it costs a row and exit 3, never a number
     rows = [(f"root '{root.as_written}'", ROOT_GONE, "suspect") for root in config.roots if not root.path.is_dir()]
     unmatched = [pattern for pattern, _, _ in config.titles if not any(pattern.search(title) for title in titles)]
-    return rows + [(f"title '{pattern.pattern}'", TITLE_UNMATCHED, "suspect") for pattern in unmatched]
+    rows += [(f"title '{pattern.pattern}'", TITLE_UNMATCHED, "suspect") for pattern in unmatched]
+    if cwd_blind(config, events, now):
+        rows.append(("cwd source", CWD_BLIND, "suspect"))
+    return rows
 
 
 def render_rows(rows: Sequence[tuple[str, ...]]) -> list[str]:
@@ -786,7 +797,7 @@ def cmd_doctor(config: Config) -> int:
             print(f"  {note}")
     # a focus event may carry no title, as resolve_title's signature already allows; it then matched no pattern
     titles = {event["title"] for event in events if event["ev"] == "focus" and event.get("title")}
-    suspect = suspect_rows(config, titles)
+    suspect = suspect_rows(config, titles, events, now)
     if suspect:
         print("\n" + "\n".join(render_rows(suspect)))
     if any(row.verdict == "dark" for row in sensors):

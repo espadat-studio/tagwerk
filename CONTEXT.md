@@ -43,7 +43,7 @@ The installed path by which a sensor reaches the ledger: a Claude Code hook that
 _Avoid_: setup, integration, plumbing
 
 **Suspect**:
-Configuration that cannot be doing anything: a root that is no directory, or a `[[title]]` pattern that has never matched a title in the ledger. Advisory, never a fault: the drive may be unmounted, or the app may simply not have run.
+Something configured or installed that cannot be doing anything: a root that is no directory, a `[[title]]` pattern that has never matched a title in the ledger, or a cwd source that has returned no path. Advisory, never a fault: the drive may be unmounted, the app may simply not have run, or no terminal may have been opened.
 _Avoid_: unused, dead, invalid, broken
 
 **Span**:
