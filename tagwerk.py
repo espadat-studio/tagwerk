@@ -80,6 +80,13 @@ class Wiring(NamedTuple):
     note: str
 
 
+class Sensor(NamedTuple):
+    name: str
+    marks: tuple[str, ...]
+    judged: bool
+    dark_after: timedelta
+
+
 OTHER = Bucket("personal", "other")
 PAID = ("work", "fixed")
 RULE_KINDS = (*PAID, "personal")
@@ -91,7 +98,9 @@ TitleRule = tuple[re.Pattern[str], str, str | None]
 class Config:
     data_dir: Path
     poll_stale: timedelta
-    sensor_dark: timedelta
+    poll_dark: timedelta
+    beat_dark: timedelta
+    idle_dark: timedelta
     beat_lease: timedelta
     beat_throttle: timedelta
     focus_lease: timedelta
@@ -118,7 +127,9 @@ poll_stale_min = 2 # a poll this recent proves the machine was on
 beat_lease_min = 10 # an agent beat leases its repo this long
 beat_throttle_sec = 60 # an agent appends at most one beat per cwd this often
 focus_lease_min = 1 # a focused kitty cwd or GitHub repo title leases its repo this long
-sensor_dark_h = 168 # a week; tagwerk doctor calls a sensor this quiet dark, measured against the last poll
+poll_dark_h = 168 # a week; tagwerk doctor calls the focus poller this quiet dark, measured against the last poll
+beat_dark_h = 48 # two days; an agent hook falls silent faster than a desktop does, and its minutes reach an invoice
+idle_dark_h = 168 # a week; the same for the idle listener
 kitty_socket = "unix:${XDG_RUNTIME_DIR}/omarchy-kitty-{pid}" # Omarchy default; {pid} is the focused kitty's pid
 day_cap_h = 8 # week labels turn red above this; caps change colours, never numbers
 week_cap_h = 40 # the week footer and month week bars turn red above this
@@ -213,7 +224,9 @@ def load_config(path: Path, data_dir: Path | None) -> Config:
         data_dir=Path(chosen).expanduser(),
         poll_sec=raw.get("poll_sec", 15),
         poll_stale=timedelta(minutes=raw.get("poll_stale_min", 2)),
-        sensor_dark=timedelta(hours=raw.get("sensor_dark_h", 168)),
+        poll_dark=timedelta(hours=raw.get("poll_dark_h", 168)),
+        beat_dark=timedelta(hours=raw.get("beat_dark_h", 48)),
+        idle_dark=timedelta(hours=raw.get("idle_dark_h", 168)),
         beat_lease=timedelta(minutes=raw.get("beat_lease_min", 10)),
         beat_throttle=timedelta(seconds=raw.get("beat_throttle_sec", 60)),
         focus_lease=timedelta(minutes=raw.get("focus_lease_min", 1)),
@@ -700,20 +713,25 @@ def agent_wiring() -> list[tuple[str, Wiring]]:
     return [(src, Wiring(name, *check())) for src, name, check in AGENTS]
 
 
-def sensor_marks(wired: set[str]) -> list[tuple[str, tuple[str, ...], bool]]:
-    beats = [(f"beat {src}", (f"beat:{src}",), src in wired) for src, _, _ in AGENTS]
-    return [("poll", ("focus",), True), *beats, ("idle mark", ("idle", "active"), True)]
+def sensors(config: Config, wired: set[str]) -> list[Sensor]:
+    beats = [Sensor(f"beat {src}", (f"beat:{src}",), src in wired, config.beat_dark) for src, _, _ in AGENTS]
+    return [
+        Sensor("poll", ("focus",), True, config.poll_dark),
+        *beats,
+        Sensor("idle mark", ("idle", "active"), True, config.idle_dark),
+    ]
 
 
 def sensor_rows(config: Config, seen: dict[str, datetime], wired: set[str], now: datetime) -> list[Finding]:
     rows = []
-    for sensor, marks, judged in sensor_marks(wired):
-        last = max((seen[mark] for mark in marks if mark in seen), default=None)
+    for sensor in sensors(config, wired):
+        last = max((seen[mark] for mark in sensor.marks if mark in seen), default=None)
         # ponytail: the poller is the reference, so it alone measures against now; the rest need a poll to be judged
-        against = now if "focus" in marks else seen.get("focus")
+        against = now if "focus" in sensor.marks else seen.get("focus")
         when = f"{last.astimezone():%Y-%m-%d %H:%M}" if last else "never"
         age = f"{format_age(now - last)} ago" if last else "-"
-        rows.append(Finding(sensor, when, age, verdict(last, against if judged else None, config.sensor_dark)))
+        judged_against = against if sensor.judged else None
+        rows.append(Finding(sensor.name, when, age, verdict(last, judged_against, sensor.dark_after)))
     return rows
 
 

@@ -14,7 +14,7 @@ tagwerk day
 
 `doctor` prints one row per sensor (`poll`, `beat claude`, `beat pi` and `idle mark`) with when it last appended and a verdict. Four `live` rows mean the focus poller, both agent hooks and the idle listener all reach the ledger, and `day` lists the repo you were in. Each agent gets its own row, so a Claude hook that stops firing shows up even while the pi extension keeps beating.
 
-A row reads `unknown` when no poll proves the machine was ever on, so there is nothing to measure that sensor's silence against. A beat row also reads `unknown` when its agent is not `wired`: an agent you never installed explains its own silence. A row reads `dark` when a sensor has appended nothing while the machine was demonstrably on, for longer than `sensor_dark_h`.
+A row reads `unknown` when no poll proves the machine was ever on, so there is nothing to measure that sensor's silence against. A beat row also reads `unknown` when its agent is not `wired`: an agent you never installed explains its own silence. A row reads `dark` when a sensor has appended nothing while the machine was demonstrably on, for longer than that sensor's threshold: `poll_dark_h`, `beat_dark_h` or `idle_dark_h`.
 
 ## Wiring
 

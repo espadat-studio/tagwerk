@@ -1652,7 +1652,7 @@ def test_the_site_documents_the_install_commands_doctor_prints() -> None:
 def test_the_config_page_lists_every_template_key_with_its_default() -> None:
     scalars = tagwerk.CONFIG_TEMPLATE.split("[roots]")[0]
     keys = re.findall(r"^(\w+) = (.+?)(?: #|$)", scalars, re.MULTILINE)
-    assert len(keys) == 10
+    assert len(keys) == 12
     rows = [row for row in (DOCS / "configuration.md").read_text().splitlines() if row.startswith("|")]
     for key, raw in keys:
         default = raw.strip().strip('"')
@@ -2068,7 +2068,7 @@ def test_doctor_paints_only_the_dark_row_red_and_drops_it_for_no_color(
 def test_doctor_takes_its_darkness_threshold_from_the_config(
     home: Path, wired_agents: None, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    (home / "config.toml").write_text(f'data_dir = "{home}/data"\nsensor_dark_h = 1\n')
+    (home / "config.toml").write_text(f'data_dir = "{home}/data"\nbeat_dark_h = 1\n')
     monkeypatch.setenv("TAGWERK_CONFIG", str(home / "config.toml"))
     seed(
         home / "data",
@@ -2078,6 +2078,21 @@ def test_doctor_takes_its_darkness_threshold_from_the_config(
         mark(ago(minutes=3), "idle"),
     )
     assert [cells[-1] for cells in per_sensor(doctor(capsys, 2)).values()] == ["live", "dark", "live", "live"]
+
+
+def test_doctor_gives_each_sensor_its_own_darkness_threshold(
+    bare_ledger: Path, wired_agents: None, capsys: pytest.CaptureFixture[str]
+) -> None:
+    seed(
+        bare_ledger,
+        poll(ago(hours=60)),
+        beat(ago(hours=60), "~/code/blog"),
+        beat(ago(hours=60), "~/code/blog", "pi"),
+        mark(ago(hours=60), "idle"),
+        poll(ago(minutes=2)),
+    )
+    rows = per_sensor(doctor(capsys, 2))
+    assert [cells[-1] for cells in rows.values()] == ["live", "dark", "dark", "live"]
 
 
 def test_doctor_findings_go_to_stdout(bare_ledger: Path, capsys: pytest.CaptureFixture[str]) -> None:
