@@ -20,7 +20,7 @@ A repo signal grants that repo a **lease**: a period during which it is eligible
 | Signal                       | Leases for        |
 | ---------------------------- | ----------------- |
 | an agent beat                | `beat_lease_min`  |
-| a focused kitty cwd          | `focus_lease_min` |
+| a focused terminal's cwd     | `focus_lease_min` |
 | a window title naming a repo | `focus_lease_min` |
 
 A lease is what lets a leased repo keep earning while an unrelated window is focused: a browser tab read during a long agent turn still books to the repo the agent is working in.
@@ -33,7 +33,7 @@ Beats while idle book nothing, so an unattended overnight agent adds no hours. C
 
 With no repo holding a lease, the focused window decides, and what it implies is the **ambient bucket**. It is credited only when no repo holds a lease, because a repo signal always wins over the window in front of you.
 
-- A kitty shell sitting at a root books that kind's `general`.
+- A shell sitting at a root books that kind's `general`.
 - A title matching a `[[title]]` rule books what that rule says, so Slack, Zoom, Meet or your org's GitHub books `work/general`.
 - Anything else books `personal/other`.
 

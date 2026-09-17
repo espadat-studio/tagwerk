@@ -3,7 +3,7 @@ title: Installation
 description: Install tagwerk from the AUR, enable the units, and wire hypridle and the agent hooks.
 ---
 
-Built and tested on Omarchy 4; any Arch Hyprland works, with [kitty remote control](#kitty-remote-control) as the one piece Omarchy configures for you. The [AUR package](https://aur.archlinux.org/packages/tagwerk-git) pulls `hypridle` and the system Python; tagwerk itself has no runtime dependencies (ADR-0004) and tracks master (ADR-0005).
+Built and tested on Omarchy 4; any Arch Hyprland works (ADR-0015). The [AUR package](https://aur.archlinux.org/packages/tagwerk-git) pulls `hypridle` and the system Python; tagwerk itself has no runtime dependencies (ADR-0004) and tracks master (ADR-0005). The units need Hyprland started through [uwsm](#uwsm); the [terminal cwd](#terminal-cwd) sensor needs nothing configured on any terminal.
 
 ```sh
 paru -S tagwerk-git
@@ -17,7 +17,9 @@ That leaves one piece: the [agent hooks](/getting-started/agent-hooks/) are part
 
 ## Edit the config
 
-`tagwerk init` writes a commented template that names an org that is not yours, so it does nothing useful until you edit it. Point `[roots]` at your work org's clone directory as `work` and at your personal code directory as `personal`, and make the `[[title]]` patterns match your org's GitHub titles and chat apps. [Configuration](/configuration/) covers every key, its default and how a bad rule is rejected.
+`tagwerk init` writes a template whose only live root is `~/code` as `personal`, so every minute books to personal until you edit it. Uncomment a work root and point it at the directory your work repos are cloned into, then uncomment the `[[title]]` rules and make their patterns match your org's GitHub titles and chat apps. [Configuration](/configuration/) covers every key, its default and how a bad rule is rejected.
+
+`tagwerk doctor` reads a root that is no directory and a `[[title]]` pattern that has never matched as **suspect**, so a rule that cannot fire says so rather than going quiet.
 
 ## The units
 
@@ -25,8 +27,16 @@ That leaves one piece: the [agent hooks](/getting-started/agent-hooks/) are part
 
 Omarchy's shell already runs the screensaver at 150 s and the lock at 300 s, so the packaged listener fires at the same 150 s without input and no minutes fall between screensaver and lock. If you already run `hypridle.service` with your own config, add its `tagwerk idle` and `tagwerk active` lines there and skip `tagwerk-idle.service`.
 
-## kitty remote control
+## uwsm
 
-The poller reads the kitty cwd over kitty remote control on Omarchy's per-pid socket. `/etc/xdg/kitty/kitty.conf` already sets `allow_remote_control socket-only` and `listen_on`; a user `kitty.conf` must not override them. A kitty started outside Omarchy's config has no socket; its cwd is written as `null` and the poller keeps running.
+Both units carry `ConditionEnvironment=HYPRLAND_INSTANCE_SIGNATURE` and `WantedBy=graphical-session.target`. Hyprland started through uwsm supplies both, which is Hyprland's own recommended launch path and what Omarchy uses. Hyprland started bare from a TTY supplies neither, so the units never start at all; `tagwerk doctor` then reads the poll sensor as **dark**, which is the right verdict for the right reason. If you launch Hyprland another way, import `HYPRLAND_INSTANCE_SIGNATURE` into the systemd user environment yourself before the units are wanted.
+
+## terminal cwd
+
+The poller resolves the focused terminal's working directory from two sources, in that order, and needs no list of which terminals you use.
+
+A kitty window answers over its remote-control socket, which stays exact with several tabs or splits open. `/etc/xdg/kitty/kitty.conf` sets `allow_remote_control socket-only` and `listen_on`, and a user `kitty.conf` must not override them. If you run kitty outside Omarchy's config, point `kitty_socket` at your own `listen_on` to keep that precision.
+
+Every other terminal — including foot, which is Omarchy 4's default — resolves from `/proc`: the poller reads the working directory of the window's login shell, checked against `/etc/shells`. A window with more than one shell child resolves to nothing rather than guessing which one you are looking at (ADR-0016), and so does a shell under tmux or another multiplexer, because that shell is not a direct child of the terminal. `tagwerk doctor` reads a poller that has resolved no cwd at all as **suspect**.
 
 Once everything is in place, [verify it](/getting-started/verification/).

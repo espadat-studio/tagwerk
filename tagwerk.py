@@ -864,7 +864,7 @@ def main(argv: list[str]) -> int:
         "invoice", parents=[plain], help="markdown table of work hours per project in quarter hours"
     )
     add_period(invoice, "month", parse_month, "YYYY-MM")
-    focus = commands.add_parser("focus", help="poll the focused window and kitty cwd into the ledger")
+    focus = commands.add_parser("focus", help="poll the focused window and terminal cwd into the ledger")
     focus.add_argument("--once", action="store_true", help="one poll, then exit")
     import_timew = commands.add_parser("import-timew", help="one-shot import of the timewarrior export as spans")
     import_timew.add_argument("--work-tag", required=True, metavar="TAG", help="tag that marks an interval as work")

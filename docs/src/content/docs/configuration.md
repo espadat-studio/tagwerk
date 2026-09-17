@@ -9,20 +9,20 @@ Every key below ships with a default, so a config that sets only `[roots]` works
 
 ## Keys
 
-| Key                 | Default                                       | What it does                                                                                      |
-| ------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `data_dir`          | `~/.local/share/tagwerk`                      | where the monthly ledger files live; `--data-dir` and `TAGWERK_DATA_DIR` beat it                  |
-| `poll_sec`          | `15`                                          | how often the focus poller appends a poll                                                         |
-| `poll_stale_min`    | `2`                                           | a poll this recent proves the machine was on; older and the minute is absent                      |
-| `beat_lease_min`    | `10`                                          | how long an agent beat leases its repo                                                            |
-| `beat_throttle_sec` | `60`                                          | one beat per source and cwd per this gap; the rest are dropped                                    |
-| `focus_lease_min`   | `1`                                           | how long a focused kitty cwd or a GitHub repo title leases its repo                               |
-| `poll_dark_h`       | `168`                                         | a week; `tagwerk doctor` calls the focus poller this quiet dark, measured from the last poll      |
-| `beat_dark_h`       | `48`                                          | two days; an agent hook falls silent faster than a desktop does, and its minutes reach an invoice |
-| `idle_dark_h`       | `168`                                         | a week; the same for the idle listener                                                            |
-| `kitty_socket`      | `unix:${XDG_RUNTIME_DIR}/omarchy-kitty-{pid}` | the kitty remote-control socket; `{pid}` is the focused kitty's pid                               |
-| `day_cap_h`         | `8`                                           | the day cap: `week` labels turn red above it, and `day --json` reports `over_cap`                 |
-| `week_cap_h`        | `40`                                          | the week cap: the `week` footer and the `month` week bars turn red above it                       |
+| Key                 | Default                                       | What it does                                                                                                                                                                                               |
+| ------------------- | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data_dir`          | `~/.local/share/tagwerk`                      | where the monthly ledger files live; `--data-dir` and `TAGWERK_DATA_DIR` beat it                                                                                                                           |
+| `poll_sec`          | `15`                                          | how often the focus poller appends a poll                                                                                                                                                                  |
+| `poll_stale_min`    | `2`                                           | a poll this recent proves the machine was on; older and the minute is absent                                                                                                                               |
+| `beat_lease_min`    | `10`                                          | how long an agent beat leases its repo                                                                                                                                                                     |
+| `beat_throttle_sec` | `60`                                          | one beat per source and cwd per this gap; the rest are dropped                                                                                                                                             |
+| `focus_lease_min`   | `1`                                           | how long a focused terminal's cwd or a GitHub repo title leases its repo                                                                                                                                   |
+| `poll_dark_h`       | `168`                                         | a week; `tagwerk doctor` calls the focus poller this quiet dark, measured from the last poll                                                                                                               |
+| `beat_dark_h`       | `48`                                          | two days; an agent hook falls silent faster than a desktop does, and its minutes reach an invoice                                                                                                          |
+| `idle_dark_h`       | `168`                                         | a week; the same for the idle listener                                                                                                                                                                     |
+| `kitty_socket`      | `unix:${XDG_RUNTIME_DIR}/omarchy-kitty-{pid}` | the kitty remote-control socket; `{pid}` is the focused kitty's pid. Match it to your own `listen_on` if you run kitty outside Omarchy's config; any other terminal resolves from `/proc` and needs no key |
+| `day_cap_h`         | `8`                                           | the day cap: `week` labels turn red above it, and `day --json` reports `over_cap`                                                                                                                          |
+| `week_cap_h`        | `40`                                          | the week cap: the `week` footer and the `month` week bars turn red above it                                                                                                                                |
 
 Caps change colours, never numbers.
 

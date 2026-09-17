@@ -101,7 +101,7 @@ A minute booked to a bucket: every present minute, plus every minute covered by 
 _Avoid_: worked, logged, tracked
 
 **Lease**:
-The period after a repo signal (a beat, a focused kitty cwd, a GitHub title) during which that repo is eligible for credit. A present minute is split evenly across all leased repos.
+The period after a repo signal (a beat, a focused terminal's cwd, a GitHub title) during which that repo is eligible for credit. A present minute is split evenly across all leased repos.
 _Avoid_: window, TTL, timeout
 
 **Ambient bucket**:

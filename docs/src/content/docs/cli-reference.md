@@ -96,7 +96,7 @@ These are run by systemd, hypridle and the agent hooks, not by hand.
 
 | Command                         | Does                                                                                                                         |
 | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `tagwerk focus [--once]`        | the focus poller; polls window class, title and kitty cwd every `poll_sec`. `--once` writes one poll and exits               |
+| `tagwerk focus [--once]`        | the focus poller; polls window class, title and terminal cwd every `poll_sec`. `--once` writes one poll and exits            |
 | `tagwerk beat SRC [--cwd PATH]` | an agent signal from `SRC` (`claude` or `pi`); cwd from `--cwd`, else the `cwd` field of JSON on stdin, else the process cwd |
 | `tagwerk idle`                  | mark the start of idle, from the hypridle listener or before sleep                                                           |
 | `tagwerk active`                | mark the end of idle, from the hypridle listener or after sleep                                                              |
