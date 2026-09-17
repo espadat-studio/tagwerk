@@ -27,6 +27,8 @@ EXAMPLES = """examples:
   tagwerk invoice --ago 1     last month's invoice table
 """
 REPOLL_SEC = 60
+PROC = Path("/proc")
+SHELLS = Path("/etc/shells")
 EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 BAR_WIDTH = 24
 DAY_SCALE_H = 12
@@ -592,10 +594,28 @@ def parse_kitty_ls(os_windows: list[dict[str, Any]]) -> str | None:
     return cwd
 
 
+def login_shells() -> set[str]:
+    lines = (line.strip() for line in SHELLS.read_text().splitlines())
+    return {line for line in lines if line and not line.startswith("#")}
+
+
+def proc_cwd(pid: int) -> str | None:
+    # ponytail: direct children only, so a shell under tmux or any other wrapper is invisible; refusing beats guessing
+    try:
+        children = (PROC / str(pid) / "task" / str(pid) / "children").read_text().split()
+        shells = login_shells()
+        found = [child for child in children if os.readlink(PROC / child / "exe") in shells]
+        return os.readlink(PROC / found[0] / "cwd") if len(found) == 1 else None
+    except OSError:
+        return None
+
+
 def kitty_cwd(config: Config, pid: int) -> str | None:
-    socket = os.path.expandvars(config.kitty_socket).format(pid=pid)
+    socket_path = Path(os.path.expandvars(config.kitty_socket).format(pid=pid).removeprefix("unix:"))
+    if not socket_path.is_socket():
+        return None
     output = subprocess.run(
-        ["kitten", "@", "--to", socket, "ls"], capture_output=True, text=True, check=False, timeout=2
+        ["kitten", "@", "--to", f"unix:{socket_path}", "ls"], capture_output=True, text=True, check=False, timeout=2
     )
     if output.returncode:
         return None
@@ -609,7 +629,7 @@ def cmd_focus(config: Config, once: bool) -> None:
         window = active_window()
         if window:
             window_class, title, pid = window
-            cwd = kitty_cwd(config, pid) if window_class == "kitty" else None
+            cwd = kitty_cwd(config, pid) or proc_cwd(pid)
             current = (window_class, title, cwd)
             # ponytail: poll_sec granularity; Hyprland socket2 events would be finer but cannot see cd
             if current != last or monotonic() - last_write >= REPOLL_SEC:

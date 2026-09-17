@@ -3,6 +3,7 @@ import io
 import json
 import os
 import re
+import socket
 import subprocess
 import sys
 import time
@@ -1242,7 +1243,34 @@ def fake_bin(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     bin_dir.mkdir()
     monkeypatch.setenv("PATH", f"{bin_dir}:{os.environ['PATH']}")
     monkeypatch.setenv("XDG_RUNTIME_DIR", str(tmp_path / "run"))
+    proc = tmp_path / "proc"
+    proc.mkdir()
+    monkeypatch.setattr(tagwerk, "PROC", proc)
+    shells = tmp_path / "shells"
+    shells.write_text("# Pathnames of valid login shells.\n\n/usr/bin/bash\n/usr/bin/zsh\n")
+    monkeypatch.setattr(tagwerk, "SHELLS", shells)
     return bin_dir
+
+
+def kitty_socket(tmp_path: Path, pid: int = 4242) -> Path:
+    path = tmp_path / "run" / f"omarchy-kitty-{pid}"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    bound = socket.socket(socket.AF_UNIX)
+    bound.bind(str(path))
+    bound.close()
+    return path
+
+
+def fake_proc(tmp_path: Path, pid: int, *children: tuple[int, str, str]) -> None:
+    proc = tmp_path / "proc"
+    task = proc / str(pid) / "task" / str(pid)
+    task.mkdir(parents=True, exist_ok=True)
+    (task / "children").write_text(" ".join(str(child) for child, _, _ in children))
+    for child, exe, cwd in children:
+        entry = proc / str(child)
+        entry.mkdir(parents=True, exist_ok=True)
+        (entry / "exe").symlink_to(exe)
+        (entry / "cwd").symlink_to(cwd)
 
 
 def fake(bin_dir: Path, name: str, *replies: str) -> Path:
@@ -1301,6 +1329,7 @@ def ledger_lines(data_dir: Path) -> list[dict[str, Any]]:
 def test_focus_once_writes_the_active_kitty_windows_foreground_cwd(
     data_dir: Path, fake_bin: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
+    kitty_socket(tmp_path)
     fake(fake_bin, "hyprctl", hypr_window())
     kitten_args = fake(fake_bin, "kitten", json.dumps(kitty_ls()))
     run(capsys, "focus", "--once")
@@ -1316,10 +1345,11 @@ def test_focus_once_writes_the_active_kitty_windows_foreground_cwd(
 
 
 def test_focus_at_prompt_uses_the_window_cwd(
-    data_dir: Path, fake_bin: Path, capsys: pytest.CaptureFixture[str]
+    data_dir: Path, fake_bin: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     blob = kitty_ls()
     blob[0]["tabs"][1]["windows"][1]["foreground_processes"] = []
+    kitty_socket(tmp_path)
     fake(fake_bin, "hyprctl", hypr_window())
     fake(fake_bin, "kitten", json.dumps(blob))
     run(capsys, "focus", "--once")
@@ -1329,13 +1359,14 @@ def test_focus_at_prompt_uses_the_window_cwd(
 
 @pytest.mark.parametrize("level", ["os_window", "tab", "window"])
 def test_focus_with_nothing_active_at_some_level_writes_null_cwd(
-    data_dir: Path, fake_bin: Path, capsys: pytest.CaptureFixture[str], level: str
+    data_dir: Path, fake_bin: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str], level: str
 ) -> None:
     blob = kitty_ls()
     os_window = blob[0]
     tab = os_window["tabs"][1]
     window = tab["windows"][1]
     {"os_window": os_window, "tab": tab, "window": window}[level]["is_active"] = False
+    kitty_socket(tmp_path)
     fake(fake_bin, "hyprctl", hypr_window())
     fake(fake_bin, "kitten", json.dumps(blob))
     run(capsys, "focus", "--once")
@@ -1345,8 +1376,9 @@ def test_focus_with_nothing_active_at_some_level_writes_null_cwd(
 
 
 def test_focus_kitten_failure_leaves_cwd_unknown(
-    data_dir: Path, fake_bin: Path, capsys: pytest.CaptureFixture[str]
+    data_dir: Path, fake_bin: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
+    kitty_socket(tmp_path)
     fake(fake_bin, "hyprctl", hypr_window())
     fake(fake_bin, "kitten")
     run(capsys, "focus", "--once")
@@ -1355,14 +1387,15 @@ def test_focus_kitten_failure_leaves_cwd_unknown(
     assert poll["cwd"] is None
 
 
-def test_focus_raises_on_malformed_kitten_json(data_dir: Path, fake_bin: Path) -> None:
+def test_focus_raises_on_malformed_kitten_json(data_dir: Path, fake_bin: Path, tmp_path: Path) -> None:
+    kitty_socket(tmp_path)
     fake(fake_bin, "hyprctl", hypr_window())
     fake(fake_bin, "kitten", "not json")
     with pytest.raises(json.JSONDecodeError):
         tagwerk.main(["focus", "--once"])
 
 
-def test_focus_skips_kitten_for_other_classes(
+def test_focus_skips_kitten_when_no_socket_answers(
     data_dir: Path, fake_bin: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     fake(fake_bin, "hyprctl", hypr_window("vivaldi-stable", "Fix · Issue #1 · org/assets - Vivaldi"))
@@ -1372,6 +1405,75 @@ def test_focus_skips_kitten_for_other_classes(
     assert poll["class"] == "vivaldi-stable"
     assert poll["cwd"] is None
     assert not kitten_args.exists()
+
+
+def test_focus_resolves_a_single_shell_child_from_proc(
+    data_dir: Path, fake_bin: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    fake_proc(tmp_path, 4242, (4300, "/usr/bin/bash", "/home/s/code/work-org/assets"))
+    fake(fake_bin, "hyprctl", hypr_window("foot", "assets"))
+    kitten_args = fake(fake_bin, "kitten", json.dumps(kitty_ls()))
+    run(capsys, "focus", "--once")
+    [poll] = ledger_lines(data_dir)
+    assert poll["class"] == "foot"
+    assert poll["cwd"] == "/home/s/code/work-org/assets"
+    assert not kitten_args.exists()
+
+
+def test_focus_refuses_an_ambiguous_proc_cwd(
+    data_dir: Path, fake_bin: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    fake_proc(
+        tmp_path,
+        4242,
+        (4300, "/usr/bin/bash", "/home/s/code/work-org/assets"),
+        (4301, "/usr/bin/zsh", "/home/s/code/work-org/checkout"),
+    )
+    fake(fake_bin, "hyprctl", hypr_window("foot", "assets"))
+    run(capsys, "focus", "--once")
+    [poll] = ledger_lines(data_dir)
+    assert poll["cwd"] is None
+
+
+def test_focus_ignores_a_proc_child_that_is_no_login_shell(
+    data_dir: Path, fake_bin: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    fake_proc(tmp_path, 4242, (4300, "/usr/bin/tmux", "/home/s"))
+    fake(fake_bin, "hyprctl", hypr_window("foot", "assets"))
+    run(capsys, "focus", "--once")
+    [poll] = ledger_lines(data_dir)
+    assert poll["cwd"] is None
+
+
+def test_focus_writes_null_cwd_when_a_window_has_no_children(
+    data_dir: Path, fake_bin: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    fake_proc(tmp_path, 4242)
+    fake(fake_bin, "hyprctl", hypr_window("vivaldi-stable", "Inbox - Vivaldi"))
+    run(capsys, "focus", "--once")
+    [poll] = ledger_lines(data_dir)
+    assert poll["cwd"] is None
+
+
+def test_focus_writes_null_cwd_when_the_process_is_already_gone(
+    data_dir: Path, fake_bin: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    fake(fake_bin, "hyprctl", hypr_window("foot", "assets"))
+    run(capsys, "focus", "--once")
+    [poll] = ledger_lines(data_dir)
+    assert poll["cwd"] is None
+
+
+def test_focus_prefers_the_kitty_socket_over_proc(
+    data_dir: Path, fake_bin: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    kitty_socket(tmp_path)
+    fake_proc(tmp_path, 4242, (4300, "/usr/bin/bash", "/home/s/wrong"))
+    fake(fake_bin, "hyprctl", hypr_window())
+    fake(fake_bin, "kitten", json.dumps(kitty_ls()))
+    run(capsys, "focus", "--once")
+    [poll] = ledger_lines(data_dir)
+    assert poll["cwd"] == "/home/s/code/assets.1/src"
 
 
 def test_focus_writes_nothing_when_nothing_is_focused(
