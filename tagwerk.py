@@ -129,7 +129,7 @@ poll_sec = 15
 poll_stale_min = 2 # a poll this recent proves the machine was on
 beat_lease_min = 10 # an agent beat leases its repo this long
 beat_throttle_sec = 60 # an agent appends at most one beat per cwd this often
-focus_lease_min = 1 # a focused kitty cwd or GitHub repo title leases its repo this long
+focus_lease_min = 1 # a focused terminal cwd or GitHub repo title leases its repo this long
 poll_dark_h = 168 # a week; tagwerk doctor calls the focus poller this quiet dark, measured against the last poll
 beat_dark_h = 48 # two days; an agent hook falls silent faster than a desktop does, and its minutes reach an invoice
 idle_dark_h = 168 # a week; the same for the idle listener
@@ -138,22 +138,21 @@ day_cap_h = 8 # week labels turn red above this; caps change colours, never numb
 week_cap_h = 40 # the week footer and month week bars turn red above this
 
 [roots] # longest match wins; the project is the first directory below the root, cut at its first dot
-"~/code/work-org" = "work"
-"~/memories/work" = "work"
+# "~/code/your-employer" = "work" # paid and invoiced; name it after the directory your work repos sit in
 # "~/code/fixed-price-client" = "fixed" # paid, so it counts toward the caps, but never invoiced
 "~/code" = "personal"
 
 [rename] # a retired project name folds into its current one, for all time; the kind never changes
 # "old-repo-name" = "new-repo-name"
 
-[[title]] # first match wins; consulted only when the cwd resolves to nothing
-pattern = 'work-org/(?P<project>[\w.-]+)'
-kind = "work"
+# [[title]] # first match wins; consulted only when the cwd resolves to nothing
+# pattern = 'your-employer/(?P<project>[\w.-]+)' # a GitHub or Slack title naming a repo
+# kind = "work"
 
-[[title]]
-pattern = '(?i)slack|work-org|zoom|meet\.google|bitbucket'
-kind = "work"
-project = "general"
+# [[title]] # an app that is work but names no repo, such as a call or a chat
+# pattern = '(?i)slack|zoom|meet\.google'
+# kind = "work"
+# project = "general"
 """
 
 

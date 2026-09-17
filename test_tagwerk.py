@@ -52,11 +52,40 @@ def home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return tmp_path
 
 
+SAMPLE_CONFIG = r"""data_dir = "~/.local/share/tagwerk"
+poll_sec = 15
+poll_stale_min = 2
+beat_lease_min = 10
+beat_throttle_sec = 60
+focus_lease_min = 1
+poll_dark_h = 168
+beat_dark_h = 48
+idle_dark_h = 168
+kitty_socket = "unix:${XDG_RUNTIME_DIR}/omarchy-kitty-{pid}"
+day_cap_h = 8
+week_cap_h = 40
+
+[roots]
+"~/code/work-org" = "work"
+"~/memories/work" = "work"
+"~/code" = "personal"
+
+[[title]]
+pattern = 'work-org/(?P<project>[\w.-]+)'
+kind = "work"
+
+[[title]]
+pattern = '(?i)slack|work-org|zoom|meet\.google|bitbucket'
+kind = "work"
+project = "general"
+"""
+
+
 @pytest.fixture
 def ledger(home: Path) -> Path:
     config = home / ".config/tagwerk/config.toml"
     config.parent.mkdir(parents=True)
-    config.write_text(tagwerk.CONFIG_TEMPLATE)
+    config.write_text(SAMPLE_CONFIG)
     return home / ".local/share/tagwerk"
 
 
@@ -2406,7 +2435,19 @@ def test_doctor_stays_silent_about_cwd_when_the_poller_is_already_dark(
     assert len(blocks(doctor(capsys, 2))) == 2
 
 
-def test_doctor_reads_every_entry_of_an_unedited_config_template_as_suspect(
+def test_doctor_reads_a_freshly_initialised_config_as_one_root_left_to_create(
+    home: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    path = home / "config.toml"
+    path.write_text(tagwerk.CONFIG_TEMPLATE)
+    monkeypatch.setenv("TAGWERK_CONFIG", str(path))
+    live(home / ".local/share/tagwerk", poll(ago(minutes=2), cwd=f"{home}/code/blog"))
+    (row,) = blocks(doctor(capsys, 3))[2]
+    assert row.startswith("root '~/code'")
+    assert row.endswith("suspect")
+
+
+def test_doctor_reads_every_entry_of_an_unconfigured_sample_as_suspect(
     ledger: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     live(ledger)
