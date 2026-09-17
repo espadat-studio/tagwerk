@@ -13,11 +13,11 @@ Running `tagwerk` with no command prints the description, two examples and where
 
 These go before the subcommand.
 
-| Option            | Does                                                                                                 |
-| ----------------- | ---------------------------------------------------------------------------------------------------- |
-| `--config PATH`   | read this config; beats `TAGWERK_CONFIG`, which beats `~/.config/tagwerk/config.toml`                |
-| `--data-dir PATH` | read and write this ledger directory; beats `TAGWERK_DATA_DIR`, which beats `data_dir` in the config |
-| `--version`       | the git revision the package was built from, or `master` from a checkout (ADR-0007)                  |
+| Option            | Does                                                                                                                                                                                               |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--config PATH`   | read this config; beats `TAGWERK_CONFIG`, which beats `~/.config/tagwerk/config.toml`                                                                                                              |
+| `--data-dir PATH` | read and write this ledger directory; beats `TAGWERK_DATA_DIR`, which beats `data_dir` in the config                                                                                               |
+| `--version`       | the git revision the package was built from, or `master` from a checkout ([ADR-0007](https://github.com/espadat-studio/tagwerk/blob/master/meta/adr/0007-version-is-the-packaged-git-revision.md)) |
 
 `init` rejects `--data-dir`: it writes a config, and that config is where `data_dir` belongs.
 
@@ -57,7 +57,7 @@ Hours per `kind/project` for the local day, the paid `work` subtotal, then the t
 }
 ```
 
-Buckets come in the table's own order, every minute value is a rounded integer, and `over_cap` compares `total_minutes` against `cap_minutes`, the day cap (ADR-0011). Buckets round one by one and the total rounds the raw sum, so the rows need not add up to it, exactly as in the table.
+Buckets come in the table's own order, every minute value is a rounded integer, and `over_cap` compares `total_minutes` against `cap_minutes`, the day cap ([ADR-0011](https://github.com/espadat-studio/tagwerk/blob/master/meta/adr/0011-the-day-cap-measures-presence-the-week-cap-paid.md)). Buckets round one by one and the total rounds the raw sum, so the rows need not add up to it, exactly as in the table.
 
 ### `tagwerk week [YYYY-Www] [--ago N]`
 
@@ -69,7 +69,7 @@ One bar per ISO week, counting only its days inside the month, then hours per `k
 
 ### `tagwerk invoice [YYYY-MM] [--ago N]`
 
-A markdown table of `work` hours per project in quarter hours. Rows sum to the rounded total. `fixed` never appears (ADR-0006).
+A markdown table of `work` hours per project in quarter hours. Rows sum to the rounded total. `fixed` never appears ([ADR-0006](https://github.com/espadat-studio/tagwerk/blob/master/meta/adr/0006-kind-splits-paid-from-invoiced.md)).
 
 ## Writing to the ledger
 
@@ -84,7 +84,7 @@ tagwerk fix 2026-09-08T09:00 2026-09-08T10:00 blog --kind personal
 tagwerk fix 12:00 13:00 lunch --kind off
 ```
 
-Nothing in the ledger is ever edited, so a second span over the same range is appended after the first, and the later one wins (ADR-0002).
+Nothing in the ledger is ever edited, so a second span over the same range is appended after the first, and the later one wins ([ADR-0002](https://github.com/espadat-studio/tagwerk/blob/master/meta/adr/0002-append-only-jsonl-ledger.md)).
 
 ### `tagwerk import-timew --work-tag TAG [FILE]`
 

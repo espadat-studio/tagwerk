@@ -51,7 +51,7 @@ Point `work` at your work org's clone directory and `personal` at your own code.
 | `personal` |             no             |       no       |
 | `off`      |             no             |       no       |
 
-The day cap asks a different question and no kind answers it: it counts every credited minute, `personal` included (ADR-0011).
+The day cap asks a different question and no kind answers it: it counts every credited minute, `personal` included ([ADR-0011](https://github.com/espadat-studio/tagwerk/blob/master/meta/adr/0011-the-day-cap-measures-presence-the-week-cap-paid.md)).
 
 A kind never names the payer. It says whether minutes are paid and whether they are invoiced, nothing else: two customers under the same kind are two projects, not two kinds.
 
@@ -85,7 +85,7 @@ A retired project name folds into its current one at resolution, for all time, p
 "old-repo-name" = "new-repo-name"
 ```
 
-The kind is never rewritten, so minutes credited as `personal` stay personal even if the project now sits under a work root (ADR-0010). A rename keys on the project name, not the path, so one entry reaches spans and window titles as well as cwds.
+The kind is never rewritten, so minutes credited as `personal` stay personal even if the project now sits under a work root ([ADR-0010](https://github.com/espadat-studio/tagwerk/blob/master/meta/adr/0010-a-rename-folds-a-retired-project-name.md)). A rename keys on the project name, not the path, so one entry reaches spans and window titles as well as cwds.
 
 ## Rejection
 
