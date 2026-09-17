@@ -13,9 +13,11 @@ jq -s '.[1].hooks as $add | .[0] | .hooks = reduce ($add | keys[]) as $k (.hooks
   && mv ~/.claude/settings.json.new ~/.claude/settings.json
 ```
 
-`claude-hooks.json` adds `SessionStart`, `UserPromptSubmit`, `PostToolUse` and `Stop` hooks with 5 s timeouts. The jq line appends them to the hooks the settings already hold and is safe to rerun.
+`claude-hooks.json` adds `SessionStart`, `UserPromptSubmit`, `PostToolUse` and `Stop` hooks. The jq line appends them to the hooks the settings already hold and is safe to rerun.
 
-`PostToolUse` is not optional: without it a 20 min agentic turn loses minutes 10 to 20 once the beat lease runs out.
+`PostToolUse` is not optional: without it a 20 min agentic turn loses minutes 10 to 20 once the beat lease runs out. It carries `"async": true`, because it fires on every tool call — around 33,000 a month on this machine, of which the throttle discards 98% — and waiting on a Python interpreter each time costs about 80 minutes a month. The other three fire once a session or turn, so they stay synchronous with a 5 s timeout and their exit codes still reach you.
+
+> Re-running the jq line over settings that already hold an older copy of the fragment appends the async `PostToolUse` entry beside the blocking one instead of replacing it, because `unique` compares whole objects. Delete the old `PostToolUse` entry by hand.
 
 ## pi
 

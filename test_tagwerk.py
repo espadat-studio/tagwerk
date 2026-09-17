@@ -1633,14 +1633,18 @@ def test_hypridle_config_marks_sleep_and_one_150s_listener_without_locking() -> 
     assert "lock_cmd" not in text
 
 
-def test_claude_hooks_fragment_beats_on_four_events_with_a_5s_timeout() -> None:
+def test_claude_hooks_fragment_beats_on_four_events_and_runs_post_tool_use_async() -> None:
     hooks = json.loads((CONTRIB / "claude-hooks.json").read_text())["hooks"]
     assert set(hooks) == {"SessionStart", "UserPromptSubmit", "PostToolUse", "Stop"}
     commands = [hook for groups in hooks.values() for group in groups for hook in group["hooks"]]
     assert len(commands) == 4
     assert all(hook["command"].startswith("tagwerk beat claude") for hook in commands)
-    assert all(hook["timeout"] == 5 for hook in commands)
     assert hooks["PostToolUse"][0]["matcher"] == "*"
+    hot = hooks["PostToolUse"][0]["hooks"][0]
+    assert (hot["async"], "timeout" in hot) == (True, False)
+    rare = [hook for event in hooks if event != "PostToolUse" for group in hooks[event] for hook in group["hooks"]]
+    assert [hook["timeout"] for hook in rare] == [5, 5, 5]
+    assert not any("async" in hook for hook in rare)
 
 
 def test_the_site_documents_the_install_commands_doctor_prints() -> None:
