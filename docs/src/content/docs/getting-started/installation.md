@@ -3,7 +3,7 @@ title: Installation
 description: Install tagwerk from the AUR, enable the units, and wire hypridle and the agent hooks.
 ---
 
-Built and tested on Omarchy 4; any Arch Hyprland works (ADR-0015). The [AUR package](https://aur.archlinux.org/packages/tagwerk-git) pulls `hypridle` and the system Python; tagwerk itself has no runtime dependencies (ADR-0004) and tracks master (ADR-0005). The units need Hyprland started through [uwsm](#uwsm); the [terminal cwd](#terminal-cwd) sensor needs nothing configured on any terminal.
+Built and tested on Omarchy 4; any Arch Hyprland works ([ADR-0015](https://github.com/espadat-studio/tagwerk/blob/master/meta/adr/0015-the-supported-environment-is-any-arch-hyprland.md)). The [AUR package](https://aur.archlinux.org/packages/tagwerk-git) pulls `hypridle` and the system Python; tagwerk itself has no runtime dependencies ([ADR-0004](https://github.com/espadat-studio/tagwerk/blob/master/meta/adr/0004-system-python-isolated-shebang.md)) and tracks master ([ADR-0005](https://github.com/espadat-studio/tagwerk/blob/master/meta/adr/0005-aur-only-install-path.md)). The units need Hyprland started through [uwsm](#uwsm); the [terminal cwd](#terminal-cwd) sensor needs nothing configured on any terminal.
 
 ```sh
 paru -S tagwerk-git
@@ -37,6 +37,6 @@ The poller resolves the focused terminal's working directory from two sources, i
 
 A kitty window answers over its remote-control socket, which stays exact with several tabs or splits open. `/etc/xdg/kitty/kitty.conf` sets `allow_remote_control socket-only` and `listen_on`, and a user `kitty.conf` must not override them. If you run kitty outside Omarchy's config, point `kitty_socket` at your own `listen_on` to keep that precision.
 
-Every other terminal — including foot, which is Omarchy 4's default — resolves from `/proc`: the poller reads the working directory of the window's login shell, checked against `/etc/shells`. A window with more than one shell child resolves to nothing rather than guessing which one you are looking at (ADR-0016), and so does a shell under tmux or another multiplexer, because that shell is not a direct child of the terminal. `tagwerk doctor` reads a poller that has resolved no cwd at all as **suspect**.
+Every other terminal — including foot, which is Omarchy 4's default — resolves from `/proc`: the poller reads the working directory of the window's login shell, checked against `/etc/shells`. A window with more than one shell child resolves to nothing rather than guessing which one you are looking at ([ADR-0016](https://github.com/espadat-studio/tagwerk/blob/master/meta/adr/0016-a-cwd-source-refuses-rather-than-guesses.md)), and so does a shell under tmux or another multiplexer, because that shell is not a direct child of the terminal. `tagwerk doctor` reads a poller that has resolved no cwd at all as **suspect**.
 
 Once everything is in place, [verify it](/getting-started/verification/).

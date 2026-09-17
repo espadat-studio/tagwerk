@@ -30,6 +30,6 @@ The copy is not deleted: it moves to a hidden `.espadat.tagwerk.bak.<timestamp>`
 
 Hover prints work, personal, presence, and the time left or over. Click opens `tagwerk week` in the themed floating terminal. The widget lands on the right of the bar; `omarchy bar move espadat.tagwerk` relocates it.
 
-It runs `tagwerk day --json` every 300 s and draws four rectangles. Nothing else: it never reads the ledger, never reads your config, and never re-implements the cap rule — `over_cap` arrives already computed (ADR-0011). Change `refreshIntervalSec` in the widget's settings; below 15 minutes the fill moves less than a pixel, so the interval buys the notch crossing and nothing more.
+It runs `tagwerk day --json` every 300 s and draws four rectangles. Nothing else: it never reads the ledger, never reads your config, and never re-implements the cap rule — `over_cap` arrives already computed ([ADR-0011](https://github.com/espadat-studio/tagwerk/blob/master/meta/adr/0011-the-day-cap-measures-presence-the-week-cap-paid.md)). Change `refreshIntervalSec` in the widget's settings; below 15 minutes the fill moves less than a pixel, so the interval buys the notch crossing and nothing more.
 
 `omarchy plugin update espadat.tagwerk` pulls a newer commit, and the shell hot-reloads the widget on the write. `omarchy plugin disable espadat.tagwerk` keeps it installed and only takes it off the bar; `omarchy plugin remove espadat.tagwerk` deletes it.
