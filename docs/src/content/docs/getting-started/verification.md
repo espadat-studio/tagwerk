@@ -12,9 +12,9 @@ tagwerk day
 
 ## What a working sensor looks like
 
-`doctor` prints one row per sensor (`poll`, `beat` and `idle mark`) with when it last appended and a verdict. Three `live` rows mean the focus poller, the agent hooks and the idle listener all reach the ledger, and `day` lists the repo you were in.
+`doctor` prints one row per sensor (`poll`, `beat claude`, `beat pi` and `idle mark`) with when it last appended and a verdict. Four `live` rows mean the focus poller, both agent hooks and the idle listener all reach the ledger, and `day` lists the repo you were in. Each agent gets its own row, so a Claude hook that stops firing shows up even while the pi extension keeps beating.
 
-A row reads `unknown` when no poll proves the machine was ever on, so there is nothing to measure that sensor's silence against. A row reads `dark` when a sensor has appended nothing while the machine was demonstrably on, for longer than `sensor_dark_h`.
+A row reads `unknown` when no poll proves the machine was ever on, so there is nothing to measure that sensor's silence against. A beat row also reads `unknown` when its agent is not `wired`: an agent you never installed explains its own silence. A row reads `dark` when a sensor has appended nothing while the machine was demonstrably on, for longer than that sensor's threshold: `poll_dark_h`, `beat_dark_h` or `idle_dark_h`.
 
 ## Wiring
 
@@ -45,6 +45,6 @@ A dark row names what to fix.
 
 - `poll` is the focus poller: check `systemctl --user status tagwerk-focus.service` and `journalctl --user -u tagwerk-focus.service`; systemd restarts it after 5 s.
 - `idle mark` is `tagwerk-idle.service`, or hypridle running your own config without the `tagwerk idle` and `tagwerk active` lines.
-- `beat` means the [agent hooks](/getting-started/agent-hooks/) never landed, or every turn ran outside your `[roots]`: `tagwerk beat` drops a cwd it cannot resolve and exits 0, so nothing else reports it. The wiring rows tell the two apart: a `missing` row is the install you still owe, two `wired` rows point at `[roots]`.
+- `beat claude` or `beat pi` means that agent is wired but nothing reached the ledger, so every turn ran outside your `[roots]`: `tagwerk beat` drops a cwd it cannot resolve and exits 0, so nothing else reports it. An agent that is not wired never reads dark, so a dark beat row always points at `[roots]` rather than at the install.
 
-A sensor you deliberately never wired is a known ceiling rather than a fault. [Troubleshooting](/troubleshooting/) has that one and the rest.
+[Troubleshooting](/troubleshooting/) has the known ceilings.
