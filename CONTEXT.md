@@ -43,7 +43,7 @@ The installed path by which a sensor reaches the ledger: a Claude Code hook that
 _Avoid_: setup, integration, plumbing
 
 **Suspect**:
-Configuration that cannot be doing anything: a root that is no directory, or a `[[title]]` pattern that has never matched a title in the ledger. Advisory, never a fault: the drive may be unmounted, or the app may simply not have run.
+Something configured or installed that cannot be doing anything: a root that is no directory, a `[[title]]` pattern that has never matched a title in the ledger, or a cwd source that has returned no path. Advisory, never a fault: the drive may be unmounted, the app may simply not have run, or no terminal may have been opened.
 _Avoid_: unused, dead, invalid, broken
 
 **Span**:
@@ -101,7 +101,7 @@ A minute booked to a bucket: every present minute, plus every minute covered by 
 _Avoid_: worked, logged, tracked
 
 **Lease**:
-The period after a repo signal (a beat, a focused kitty cwd, a GitHub title) during which that repo is eligible for credit. A present minute is split evenly across all leased repos.
+The period after a repo signal (a beat, a focused terminal's cwd, a GitHub title) during which that repo is eligible for credit. A present minute is split evenly across all leased repos.
 _Avoid_: window, TTL, timeout
 
 **Ambient bucket**:

@@ -3,7 +3,7 @@ title: Verification
 description: Prove every sensor reaches the ledger, read the doctor verdicts, and act on the exit codes.
 ---
 
-After 10 minutes with a kitty window focused for part of them, and one agent turn:
+After 10 minutes with a terminal focused for part of them, and one agent turn:
 
 ```sh
 tagwerk doctor

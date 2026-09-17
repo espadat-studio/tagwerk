@@ -12,13 +12,17 @@ Every item here is known and deliberate. A dark sensor is a different problem: [
 - A directory that holds worktrees books every worktree under it to the container's name, for the same reason. Give the container its own root: the longest match then picks it, and the repo name below it becomes the project.
 - Because a rename keys on the project name rather than the path, two repos sharing a name under different roots fold together. A rename is also single-hop, so renaming twice means pointing both old names at the current one.
 - Idle inhibitors are honoured, so an abandoned video call stays present and books `personal/other`. That reaches the chart and never the invoice. If it bothers you, copy `/usr/share/tagwerk/hypridle.conf`, set `ignore_dbus_inhibit = true` in the copy, and point hypridle's `--config` at it with `systemctl --user edit tagwerk-idle.service`.
-- Spans written before `ts` carried microseconds resolve by file order when two of them share a second across month files. Their append order was never recorded, so no rewrite can fix it (ADR-0009).
+- Spans written before `ts` carried microseconds resolve by file order when two of them share a second across month files. Their append order was never recorded, so no rewrite can fix it ([ADR-0009](https://github.com/espadat-studio/tagwerk/blob/master/meta/adr/0009-ts-orders-appends-in-microseconds.md)).
+- A shell under tmux, screen or another multiplexer is not a direct child of its terminal, so `/proc` resolves no cwd for that window and its minutes fall through to the title rules. kitty reads the pane's foreground process instead, which under a multiplexer is the client, so a kitty pane inside tmux books the directory tmux itself was launched in.
+- A terminal window holding more than one login shell resolves no cwd rather than picking one, so a split or tabbed terminal that is not kitty books nothing to a repo ([ADR-0016](https://github.com/espadat-studio/tagwerk/blob/master/meta/adr/0016-a-cwd-source-refuses-rather-than-guesses.md)). kitty is exact in that case, because its socket names the focused pane.
+- The login-shell check reads `/etc/shells`, which packages register as they install, so a shell built by hand is invisible to it and its terminal resolves no cwd.
 
 ## doctor
 
-- A beat sensor reads `dark` only when its own agent reads `wired`, so an agent you never installed reads `unknown` instead of alarming (ADR-0013).
+- A beat sensor reads `dark` only when its own agent reads `wired`, so an agent you never installed reads `unknown` instead of alarming ([ADR-0013](https://github.com/espadat-studio/tagwerk/blob/master/meta/adr/0013-a-beat-sensor-is-judged-per-source.md)).
 - The Claude check reads `~/.claude/settings.json` only, so a hook wired in a project's own `.claude/settings.json` reads `missing` and its beats then go unjudged rather than dark.
 - It judges a root by whether it is a directory right now, so a root on an unmounted drive reads `suspect` until you mount it. That costs a row and exit 3, never a number in a report.
+- The cwd row reads `suspect` when no poll inside `poll_dark_h` carried a working directory, so a week spent without opening a terminal reads the same as a terminal sensor that cannot resolve one. It is advisory for that reason, and a poller already reading `dark` gets no cwd row at all.
 - It tests each `[[title]]` pattern against every title on its own, so a pattern permanently shadowed by an earlier one still reads clear. Attribution takes the first match, and replaying that order across the whole ledger would cost more than the typo it would catch.
 - Exit 2 is shared with argparse, which spends it on a usage error, so `tagwerk doctor --bogus` alarms a shell prompt exactly as a dark sensor does.
 

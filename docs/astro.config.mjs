@@ -8,7 +8,7 @@ export default defineConfig({
     starlight({
       plugins: [starlightLlmsTxt()],
       title: "tagwerk",
-      description: "Passive time tracker for Hyprland on Arch, nothing to start or stop. Every present minute books to a project: the repo under your kitty terminal, the repo your Claude Code or pi agent works in, or what the focused window implies, so a Slack thread or a Zoom call counts as work too. Built on Omarchy 4.",
+      description: "Passive time tracker for Hyprland on Arch, nothing to start or stop. Every present minute books to a project: the repo your terminal sits in, the repo your Claude Code or pi agent works in, or what the focused window implies, so a Slack thread or a Zoom call counts as work too. Built and tested on Omarchy 4; any Arch Hyprland works.",
       logo: { src: "./src/assets/mark.svg", alt: "Espadat" },
       head: [{ tag: "link", attrs: { rel: "icon", href: "/favicon.ico", sizes: "16x16 32x32" } }],
       customCss: ["@espadat/docs-theme/styles/theme.css"],

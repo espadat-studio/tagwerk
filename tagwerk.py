@@ -27,6 +27,8 @@ EXAMPLES = """examples:
   tagwerk invoice --ago 1     last month's invoice table
 """
 REPOLL_SEC = 60
+PROC = Path("/proc")
+SHELLS = Path("/etc/shells")
 EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 BAR_WIDTH = 24
 DAY_SCALE_H = 12
@@ -44,6 +46,7 @@ PALETTE = (166, 36, 176, 61, 142)
 CATCH_ALLS = ("general", "other")
 ROOT_GONE = "no such directory; its minutes book to a shorter root or personal/other"
 TITLE_UNMATCHED = "no ledger title matched; either the app never ran or it books elsewhere"
+CWD_BLIND = "no poll carried a cwd; no terminal minute can reach a repo, or no terminal was opened"
 CLAUDE_HOOKS_INSTALL = r"""jq -s '.[1].hooks as $add | .[0] | .hooks = reduce ($add | keys[]) as $k (.hooks // {}; .[$k] = ((.[$k] // []) + $add[$k] | unique))' \
   ~/.claude/settings.json /usr/share/tagwerk/claude-hooks.json > ~/.claude/settings.json.new \
   && mv ~/.claude/settings.json.new ~/.claude/settings.json"""
@@ -126,7 +129,7 @@ poll_sec = 15
 poll_stale_min = 2 # a poll this recent proves the machine was on
 beat_lease_min = 10 # an agent beat leases its repo this long
 beat_throttle_sec = 60 # an agent appends at most one beat per cwd this often
-focus_lease_min = 1 # a focused kitty cwd or GitHub repo title leases its repo this long
+focus_lease_min = 1 # a focused terminal cwd or GitHub repo title leases its repo this long
 poll_dark_h = 168 # a week; tagwerk doctor calls the focus poller this quiet dark, measured against the last poll
 beat_dark_h = 48 # two days; an agent hook falls silent faster than a desktop does, and its minutes reach an invoice
 idle_dark_h = 168 # a week; the same for the idle listener
@@ -135,22 +138,21 @@ day_cap_h = 8 # week labels turn red above this; caps change colours, never numb
 week_cap_h = 40 # the week footer and month week bars turn red above this
 
 [roots] # longest match wins; the project is the first directory below the root, cut at its first dot
-"~/code/work-org" = "work"
-"~/memories/work" = "work"
+# "~/code/your-employer" = "work" # paid and invoiced; name it after the directory your work repos sit in
 # "~/code/fixed-price-client" = "fixed" # paid, so it counts toward the caps, but never invoiced
 "~/code" = "personal"
 
 [rename] # a retired project name folds into its current one, for all time; the kind never changes
 # "old-repo-name" = "new-repo-name"
 
-[[title]] # first match wins; consulted only when the cwd resolves to nothing
-pattern = 'work-org/(?P<project>[\w.-]+)'
-kind = "work"
+# [[title]] # first match wins; consulted only when the cwd resolves to nothing
+# pattern = 'your-employer/(?P<project>[\w.-]+)' # a GitHub or Slack title naming a repo
+# kind = "work"
 
-[[title]]
-pattern = '(?i)slack|work-org|zoom|meet\.google|bitbucket'
-kind = "work"
-project = "general"
+# [[title]] # an app that is work but names no repo, such as a call or a chat
+# pattern = '(?i)slack|zoom|meet\.google'
+# kind = "work"
+# project = "general"
 """
 
 
@@ -592,10 +594,28 @@ def parse_kitty_ls(os_windows: list[dict[str, Any]]) -> str | None:
     return cwd
 
 
+def login_shells() -> set[str]:
+    lines = (line.strip() for line in SHELLS.read_text().splitlines())
+    return {line for line in lines if line and not line.startswith("#")}
+
+
+def proc_cwd(pid: int) -> str | None:
+    # ponytail: direct children only, so a shell under tmux or any other wrapper is invisible; refusing beats guessing
+    try:
+        children = (PROC / str(pid) / "task" / str(pid) / "children").read_text().split()
+        shells = login_shells()
+        found = [child for child in children if os.readlink(PROC / child / "exe") in shells]
+        return os.readlink(PROC / found[0] / "cwd") if len(found) == 1 else None
+    except OSError:
+        return None
+
+
 def kitty_cwd(config: Config, pid: int) -> str | None:
-    socket = os.path.expandvars(config.kitty_socket).format(pid=pid)
+    socket_path = Path(os.path.expandvars(config.kitty_socket).format(pid=pid).removeprefix("unix:"))
+    if not socket_path.is_socket():
+        return None
     output = subprocess.run(
-        ["kitten", "@", "--to", socket, "ls"], capture_output=True, text=True, check=False, timeout=2
+        ["kitten", "@", "--to", f"unix:{socket_path}", "ls"], capture_output=True, text=True, check=False, timeout=2
     )
     if output.returncode:
         return None
@@ -609,7 +629,7 @@ def cmd_focus(config: Config, once: bool) -> None:
         window = active_window()
         if window:
             window_class, title, pid = window
-            cwd = kitty_cwd(config, pid) if window_class == "kitty" else None
+            cwd = kitty_cwd(config, pid) or proc_cwd(pid)
             current = (window_class, title, cwd)
             # ponytail: poll_sec granularity; Hyprland socket2 events would be finer but cannot see cd
             if current != last or monotonic() - last_write >= REPOLL_SEC:
@@ -735,11 +755,21 @@ def sensor_rows(config: Config, seen: dict[str, datetime], wired: set[str], now:
     return rows
 
 
-def suspect_rows(config: Config, titles: set[str]) -> list[tuple[str, str, str]]:
+def cwd_blind(config: Config, events: list[Event], now: datetime) -> bool:
+    # a poll older than poll_dark cannot judge this; a dark poll sensor already explains a cwd that never arrives
+    polls = [event for event in events if event["ev"] == "focus"]
+    recent = [poll for poll in polls if now - datetime.fromisoformat(poll["ts"]) <= config.poll_dark]
+    return bool(recent) and not any(poll.get("cwd") for poll in recent)
+
+
+def suspect_rows(config: Config, titles: set[str], events: list[Event], now: datetime) -> list[tuple[str, str, str]]:
     # ponytail: is_dir sees an unmounted drive as a typo; advisory only, so it costs a row and exit 3, never a number
     rows = [(f"root '{root.as_written}'", ROOT_GONE, "suspect") for root in config.roots if not root.path.is_dir()]
     unmatched = [pattern for pattern, _, _ in config.titles if not any(pattern.search(title) for title in titles)]
-    return rows + [(f"title '{pattern.pattern}'", TITLE_UNMATCHED, "suspect") for pattern in unmatched]
+    rows += [(f"title '{pattern.pattern}'", TITLE_UNMATCHED, "suspect") for pattern in unmatched]
+    if cwd_blind(config, events, now):
+        rows.append(("cwd source", CWD_BLIND, "suspect"))
+    return rows
 
 
 def render_rows(rows: Sequence[tuple[str, ...]]) -> list[str]:
@@ -766,7 +796,7 @@ def cmd_doctor(config: Config) -> int:
             print(f"  {note}")
     # a focus event may carry no title, as resolve_title's signature already allows; it then matched no pattern
     titles = {event["title"] for event in events if event["ev"] == "focus" and event.get("title")}
-    suspect = suspect_rows(config, titles)
+    suspect = suspect_rows(config, titles, events, now)
     if suspect:
         print("\n" + "\n".join(render_rows(suspect)))
     if any(row.verdict == "dark" for row in sensors):
@@ -834,7 +864,7 @@ def main(argv: list[str]) -> int:
         "invoice", parents=[plain], help="markdown table of work hours per project in quarter hours"
     )
     add_period(invoice, "month", parse_month, "YYYY-MM")
-    focus = commands.add_parser("focus", help="poll the focused window and kitty cwd into the ledger")
+    focus = commands.add_parser("focus", help="poll the focused window and terminal cwd into the ledger")
     focus.add_argument("--once", action="store_true", help="one poll, then exit")
     import_timew = commands.add_parser("import-timew", help="one-shot import of the timewarrior export as spans")
     import_timew.add_argument("--work-tag", required=True, metavar="TAG", help="tag that marks an interval as work")

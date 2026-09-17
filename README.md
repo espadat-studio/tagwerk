@@ -4,11 +4,11 @@
 
 > Work hours that track themselves on a Hyprland desktop, whether you were in a repo, a Slack thread or a Zoom call, with your coding agents' time counted too.
 
-Every CLI time tracker is manual, and manual discipline is what killed the timewarrior setup this one replaces: a forgotten start, a forgotten stop. tagwerk has no start and no stop. On Hyprland it watches which repo your kitty terminal or coding agent sits in, which window has focus, and whether you are idle, then credits every present minute to a project. A repo takes the minute while one is active. Otherwise the focused window decides, so a Slack thread or a Zoom call books to work and an unrecognised window to personal. It answers two questions and no others: what goes on this month's invoice, and whether last week was too long a week.
+Every CLI time tracker is manual, and manual discipline is what killed the timewarrior setup this one replaces: a forgotten start, a forgotten stop. tagwerk has no start and no stop. On Hyprland it watches which repo your terminal or coding agent sits in, which window has focus, and whether you are idle, then credits every present minute to a project. A repo takes the minute while one is active. Otherwise the focused window decides, so a Slack thread or a Zoom call books to work and an unrecognised window to personal. It answers two questions and no others: what goes on this month's invoice, and whether last week was too long a week.
 
 | Piece        | What it does                                                                                                                                                                            |
 | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Focus poller | `tagwerk focus` as a systemd user service polls window class, title and kitty cwd                                                                                                       |
+| Focus poller | `tagwerk focus` as a systemd user service polls window class, title and terminal cwd                                                                                                    |
 | hypridle     | `tagwerk idle` and `tagwerk active` from the idle listener and around sleep                                                                                                             |
 | Agent hooks  | Claude Code hooks and a pi extension run `tagwerk beat` with the agent's cwd                                                                                                            |
 | Ledger       | `~/.local/share/tagwerk/YYYY-MM.jsonl`, append-only, UTC timestamps                                                                                                                     |
@@ -30,7 +30,7 @@ The Claude Code hooks and the pi extension are part of that install, not an opti
 
 Full documentation lives at [tagwerk.espadat.com](https://tagwerk.espadat.com):
 
-- [Installation](https://tagwerk.espadat.com/getting-started/installation/) - the AUR package, the units and the hypridle choice
+- [Installation](https://tagwerk.espadat.com/getting-started/installation/) - the AUR package, the units, uwsm and the hypridle choice
 - [Agent hooks](https://tagwerk.espadat.com/getting-started/agent-hooks/) - wiring Claude Code and pi
 - [Verification](https://tagwerk.espadat.com/getting-started/verification/) - proving each sensor reaches the ledger
 - [Concepts](https://tagwerk.espadat.com/concepts/) - presence, leases, the even split and the catch-alls
@@ -43,7 +43,7 @@ Full documentation lives at [tagwerk.espadat.com](https://tagwerk.espadat.com):
 
 ## Requirements
 
-Built and tested on Omarchy 4. Any Arch Hyprland works: the AUR package pulls `hypridle` and the system Python, and tagwerk itself has no runtime dependencies (ADR-0004) and tracks master (ADR-0005). The terminal sensor needs kitty with remote control on, which Omarchy configures and `kitty_socket` points at. The bar widget is Omarchy only.
+Built and tested on Omarchy 4. Any Arch Hyprland works (ADR-0015): the AUR package pulls `hypridle` and the system Python, and tagwerk itself has no runtime dependencies (ADR-0004) and tracks master (ADR-0005). The units need Hyprland started through uwsm, which is what puts `HYPRLAND_INSTANCE_SIGNATURE` into the systemd user environment. The terminal sensor reads every terminal: kitty exactly over its remote-control socket, and anything else from the focused window's login shell (ADR-0016). The bar widget is Omarchy only.
 
 ## This repo
 

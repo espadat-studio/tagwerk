@@ -3,6 +3,7 @@ import io
 import json
 import os
 import re
+import socket
 import subprocess
 import sys
 import time
@@ -51,11 +52,40 @@ def home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return tmp_path
 
 
+SAMPLE_CONFIG = r"""data_dir = "~/.local/share/tagwerk"
+poll_sec = 15
+poll_stale_min = 2
+beat_lease_min = 10
+beat_throttle_sec = 60
+focus_lease_min = 1
+poll_dark_h = 168
+beat_dark_h = 48
+idle_dark_h = 168
+kitty_socket = "unix:${XDG_RUNTIME_DIR}/omarchy-kitty-{pid}"
+day_cap_h = 8
+week_cap_h = 40
+
+[roots]
+"~/code/work-org" = "work"
+"~/memories/work" = "work"
+"~/code" = "personal"
+
+[[title]]
+pattern = 'work-org/(?P<project>[\w.-]+)'
+kind = "work"
+
+[[title]]
+pattern = '(?i)slack|work-org|zoom|meet\.google|bitbucket'
+kind = "work"
+project = "general"
+"""
+
+
 @pytest.fixture
 def ledger(home: Path) -> Path:
     config = home / ".config/tagwerk/config.toml"
     config.parent.mkdir(parents=True)
-    config.write_text(tagwerk.CONFIG_TEMPLATE)
+    config.write_text(SAMPLE_CONFIG)
     return home / ".local/share/tagwerk"
 
 
@@ -1242,7 +1272,34 @@ def fake_bin(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     bin_dir.mkdir()
     monkeypatch.setenv("PATH", f"{bin_dir}:{os.environ['PATH']}")
     monkeypatch.setenv("XDG_RUNTIME_DIR", str(tmp_path / "run"))
+    proc = tmp_path / "proc"
+    proc.mkdir()
+    monkeypatch.setattr(tagwerk, "PROC", proc)
+    shells = tmp_path / "shells"
+    shells.write_text("# Pathnames of valid login shells.\n\n/usr/bin/bash\n/usr/bin/zsh\n")
+    monkeypatch.setattr(tagwerk, "SHELLS", shells)
     return bin_dir
+
+
+def kitty_socket(tmp_path: Path, pid: int = 4242) -> Path:
+    path = tmp_path / "run" / f"omarchy-kitty-{pid}"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    bound = socket.socket(socket.AF_UNIX)
+    bound.bind(str(path))
+    bound.close()
+    return path
+
+
+def fake_proc(tmp_path: Path, pid: int, *children: tuple[int, str, str]) -> None:
+    proc = tmp_path / "proc"
+    task = proc / str(pid) / "task" / str(pid)
+    task.mkdir(parents=True, exist_ok=True)
+    (task / "children").write_text(" ".join(str(child) for child, _, _ in children))
+    for child, exe, cwd in children:
+        entry = proc / str(child)
+        entry.mkdir(parents=True, exist_ok=True)
+        (entry / "exe").symlink_to(exe)
+        (entry / "cwd").symlink_to(cwd)
 
 
 def fake(bin_dir: Path, name: str, *replies: str) -> Path:
@@ -1301,6 +1358,7 @@ def ledger_lines(data_dir: Path) -> list[dict[str, Any]]:
 def test_focus_once_writes_the_active_kitty_windows_foreground_cwd(
     data_dir: Path, fake_bin: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
+    kitty_socket(tmp_path)
     fake(fake_bin, "hyprctl", hypr_window())
     kitten_args = fake(fake_bin, "kitten", json.dumps(kitty_ls()))
     run(capsys, "focus", "--once")
@@ -1316,10 +1374,11 @@ def test_focus_once_writes_the_active_kitty_windows_foreground_cwd(
 
 
 def test_focus_at_prompt_uses_the_window_cwd(
-    data_dir: Path, fake_bin: Path, capsys: pytest.CaptureFixture[str]
+    data_dir: Path, fake_bin: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     blob = kitty_ls()
     blob[0]["tabs"][1]["windows"][1]["foreground_processes"] = []
+    kitty_socket(tmp_path)
     fake(fake_bin, "hyprctl", hypr_window())
     fake(fake_bin, "kitten", json.dumps(blob))
     run(capsys, "focus", "--once")
@@ -1329,13 +1388,14 @@ def test_focus_at_prompt_uses_the_window_cwd(
 
 @pytest.mark.parametrize("level", ["os_window", "tab", "window"])
 def test_focus_with_nothing_active_at_some_level_writes_null_cwd(
-    data_dir: Path, fake_bin: Path, capsys: pytest.CaptureFixture[str], level: str
+    data_dir: Path, fake_bin: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str], level: str
 ) -> None:
     blob = kitty_ls()
     os_window = blob[0]
     tab = os_window["tabs"][1]
     window = tab["windows"][1]
     {"os_window": os_window, "tab": tab, "window": window}[level]["is_active"] = False
+    kitty_socket(tmp_path)
     fake(fake_bin, "hyprctl", hypr_window())
     fake(fake_bin, "kitten", json.dumps(blob))
     run(capsys, "focus", "--once")
@@ -1345,8 +1405,9 @@ def test_focus_with_nothing_active_at_some_level_writes_null_cwd(
 
 
 def test_focus_kitten_failure_leaves_cwd_unknown(
-    data_dir: Path, fake_bin: Path, capsys: pytest.CaptureFixture[str]
+    data_dir: Path, fake_bin: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
+    kitty_socket(tmp_path)
     fake(fake_bin, "hyprctl", hypr_window())
     fake(fake_bin, "kitten")
     run(capsys, "focus", "--once")
@@ -1355,14 +1416,15 @@ def test_focus_kitten_failure_leaves_cwd_unknown(
     assert poll["cwd"] is None
 
 
-def test_focus_raises_on_malformed_kitten_json(data_dir: Path, fake_bin: Path) -> None:
+def test_focus_raises_on_malformed_kitten_json(data_dir: Path, fake_bin: Path, tmp_path: Path) -> None:
+    kitty_socket(tmp_path)
     fake(fake_bin, "hyprctl", hypr_window())
     fake(fake_bin, "kitten", "not json")
     with pytest.raises(json.JSONDecodeError):
         tagwerk.main(["focus", "--once"])
 
 
-def test_focus_skips_kitten_for_other_classes(
+def test_focus_skips_kitten_when_no_socket_answers(
     data_dir: Path, fake_bin: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     fake(fake_bin, "hyprctl", hypr_window("vivaldi-stable", "Fix · Issue #1 · org/assets - Vivaldi"))
@@ -1372,6 +1434,75 @@ def test_focus_skips_kitten_for_other_classes(
     assert poll["class"] == "vivaldi-stable"
     assert poll["cwd"] is None
     assert not kitten_args.exists()
+
+
+def test_focus_resolves_a_single_shell_child_from_proc(
+    data_dir: Path, fake_bin: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    fake_proc(tmp_path, 4242, (4300, "/usr/bin/bash", "/home/s/code/work-org/assets"))
+    fake(fake_bin, "hyprctl", hypr_window("foot", "assets"))
+    kitten_args = fake(fake_bin, "kitten", json.dumps(kitty_ls()))
+    run(capsys, "focus", "--once")
+    [poll] = ledger_lines(data_dir)
+    assert poll["class"] == "foot"
+    assert poll["cwd"] == "/home/s/code/work-org/assets"
+    assert not kitten_args.exists()
+
+
+def test_focus_refuses_an_ambiguous_proc_cwd(
+    data_dir: Path, fake_bin: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    fake_proc(
+        tmp_path,
+        4242,
+        (4300, "/usr/bin/bash", "/home/s/code/work-org/assets"),
+        (4301, "/usr/bin/zsh", "/home/s/code/work-org/checkout"),
+    )
+    fake(fake_bin, "hyprctl", hypr_window("foot", "assets"))
+    run(capsys, "focus", "--once")
+    [poll] = ledger_lines(data_dir)
+    assert poll["cwd"] is None
+
+
+def test_focus_ignores_a_proc_child_that_is_no_login_shell(
+    data_dir: Path, fake_bin: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    fake_proc(tmp_path, 4242, (4300, "/usr/bin/tmux", "/home/s"))
+    fake(fake_bin, "hyprctl", hypr_window("foot", "assets"))
+    run(capsys, "focus", "--once")
+    [poll] = ledger_lines(data_dir)
+    assert poll["cwd"] is None
+
+
+def test_focus_writes_null_cwd_when_a_window_has_no_children(
+    data_dir: Path, fake_bin: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    fake_proc(tmp_path, 4242)
+    fake(fake_bin, "hyprctl", hypr_window("vivaldi-stable", "Inbox - Vivaldi"))
+    run(capsys, "focus", "--once")
+    [poll] = ledger_lines(data_dir)
+    assert poll["cwd"] is None
+
+
+def test_focus_writes_null_cwd_when_the_process_is_already_gone(
+    data_dir: Path, fake_bin: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    fake(fake_bin, "hyprctl", hypr_window("foot", "assets"))
+    run(capsys, "focus", "--once")
+    [poll] = ledger_lines(data_dir)
+    assert poll["cwd"] is None
+
+
+def test_focus_prefers_the_kitty_socket_over_proc(
+    data_dir: Path, fake_bin: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    kitty_socket(tmp_path)
+    fake_proc(tmp_path, 4242, (4300, "/usr/bin/bash", "/home/s/wrong"))
+    fake(fake_bin, "hyprctl", hypr_window())
+    fake(fake_bin, "kitten", json.dumps(kitty_ls()))
+    run(capsys, "focus", "--once")
+    [poll] = ledger_lines(data_dir)
+    assert poll["cwd"] == "/home/s/code/assets.1/src"
 
 
 def test_focus_writes_nothing_when_nothing_is_focused(
@@ -1979,10 +2110,10 @@ def wired_agents(home: Path) -> None:
     link_pi(home)
 
 
-def live(bare_ledger: Path) -> None:
+def live(bare_ledger: Path, *polls: Event) -> None:
     seed(
         bare_ledger,
-        poll(ago(minutes=2)),
+        *(polls or (poll(ago(minutes=2), cwd="~/code/blog"),)),
         beat(ago(hours=3), "~/code/blog"),
         beat(ago(hours=4), "~/code/blog", "pi"),
         mark(ago(hours=5), "idle"),
@@ -2021,7 +2152,7 @@ def test_doctor_calls_one_agent_dark_while_the_other_still_beats(
 def test_doctor_makes_no_darkness_claim_for_an_unwired_agent(
     bare_ledger: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    seed(bare_ledger, poll(ago(minutes=2)), mark(ago(hours=2), "active"))
+    seed(bare_ledger, poll(ago(minutes=2), cwd="~/code/blog"), mark(ago(hours=2), "active"))
     rows = per_sensor(doctor(capsys, 0))
     assert [rows["beat claude"][-1], rows["beat pi"][-1]] == ["unknown", "unknown"]
 
@@ -2272,7 +2403,51 @@ def test_doctor_skips_a_focus_event_that_carries_no_title_instead_of_dying_on_it
     assert blocks(doctor(capsys, 3))[2][0].startswith(r"title '(?i)zoom|meet\.google'")
 
 
-def test_doctor_reads_every_entry_of_an_unedited_config_template_as_suspect(
+def test_doctor_calls_a_poller_that_carried_no_cwd_suspect(
+    home: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    live(configured_ledger(home, monkeypatch, ""), poll(ago(minutes=2)))
+    (row,) = blocks(doctor(capsys, 3))[2]
+    assert row.startswith("cwd source")
+    assert row.endswith("suspect")
+    assert "no terminal was opened" in row
+
+
+def test_doctor_clears_the_cwd_row_when_a_recent_poll_carried_one(
+    home: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    live(configured_ledger(home, monkeypatch, ""), poll(ago(minutes=3), cwd="~/code/blog"), poll(ago(minutes=2)))
+    assert len(blocks(doctor(capsys, 0))) == 2
+
+
+def test_doctor_calls_the_poller_blind_when_only_a_poll_beyond_poll_dark_carried_a_cwd(
+    home: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    live(configured_ledger(home, monkeypatch, ""), poll(ago(days=30), cwd="~/code/blog"), poll(ago(minutes=2)))
+    (row,) = blocks(doctor(capsys, 3))[2]
+    assert row.startswith("cwd source")
+
+
+def test_doctor_stays_silent_about_cwd_when_the_poller_is_already_dark(
+    home: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    live(configured_ledger(home, monkeypatch, ""), poll(ago(days=30)))
+    assert len(blocks(doctor(capsys, 2))) == 2
+
+
+def test_doctor_reads_a_freshly_initialised_config_as_one_root_left_to_create(
+    home: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    path = home / "config.toml"
+    path.write_text(tagwerk.CONFIG_TEMPLATE)
+    monkeypatch.setenv("TAGWERK_CONFIG", str(path))
+    live(home / ".local/share/tagwerk", poll(ago(minutes=2), cwd=f"{home}/code/blog"))
+    (row,) = blocks(doctor(capsys, 3))[2]
+    assert row.startswith("root '~/code'")
+    assert row.endswith("suspect")
+
+
+def test_doctor_reads_every_entry_of_an_unconfigured_sample_as_suspect(
     ledger: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     live(ledger)
