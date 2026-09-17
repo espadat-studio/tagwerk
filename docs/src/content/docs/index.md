@@ -1,6 +1,6 @@
 ---
 title: tagwerk
-description: "Passive time tracker for Hyprland on Arch, nothing to start or stop. Every present minute books to a project: the repo under your terminal, the repo your Claude Code or pi agent works in, or what the focused window implies, so a Slack thread or a Zoom call counts as work too. Built on Omarchy 4."
+description: "Passive time tracker for Hyprland on Arch, nothing to start or stop. Every present minute books to a project: the repo your terminal sits in, the repo your Claude Code or pi agent works in, or what the focused window implies, so a Slack thread or a Zoom call counts as work too. Built and tested on Omarchy 4; any Arch Hyprland works."
 ---
 
 > Work hours that track themselves on a Hyprland desktop, whether you were in a repo, a Slack thread or a Zoom call, with your coding agents' time counted too.
