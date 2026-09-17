@@ -116,8 +116,8 @@ def mark(moment: datetime, ev: str) -> Event:
     return {"ts": stamp(moment), "ev": ev}
 
 
-def beat(moment: datetime, cwd: str) -> Event:
-    return {"ts": stamp(moment), "ev": "beat", "src": "claude", "cwd": cwd}
+def beat(moment: datetime, cwd: str, src: str = "claude") -> Event:
+    return {"ts": stamp(moment), "ev": "beat", "src": src, "cwd": cwd}
 
 
 def present(start: datetime, count: int, **window: Any) -> list[Event]:
@@ -1965,72 +1965,119 @@ def link_pi(home: Path, target: Path = CONTRIB / "pi/tagwerk.ts") -> None:
     path.symlink_to(target)
 
 
+WIRED = json.loads((CONTRIB / "claude-hooks.json").read_text())
+BARE = {"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "echo done"}]}]}}
+
+
+@pytest.fixture
+def wired_agents(home: Path) -> None:
+    claude_settings(home, WIRED)
+    link_pi(home)
+
+
 def live(bare_ledger: Path) -> None:
-    seed(bare_ledger, poll(ago(minutes=2)), beat(ago(hours=3), "~/code/blog"), mark(ago(hours=5), "idle"))
+    seed(
+        bare_ledger,
+        poll(ago(minutes=2)),
+        beat(ago(hours=3), "~/code/blog"),
+        beat(ago(hours=4), "~/code/blog", "pi"),
+        mark(ago(hours=5), "idle"),
+    )
 
 
 def test_doctor_reports_one_live_row_per_sensor_with_its_local_time_and_age(
-    bare_ledger: Path, berlin: None, capsys: pytest.CaptureFixture[str]
+    bare_ledger: Path, wired_agents: None, berlin: None, capsys: pytest.CaptureFixture[str]
 ) -> None:
     live(bare_ledger)
     rows = per_sensor(doctor(capsys, 0))
-    assert list(rows) == ["poll", "beat", "idle mark"]
-    assert [cells[-1] for cells in rows.values()] == ["live", "live", "live"]
+    assert list(rows) == ["poll", "beat claude", "beat pi", "idle mark"]
+    assert [cells[-1] for cells in rows.values()] == ["live", "live", "live", "live"]
     assert rows["poll"][0] == f"{ago(minutes=2).astimezone():%Y-%m-%d}"
-    assert [cells[2:4] for cells in rows.values()] == [["2m", "ago"], ["3h", "ago"], ["5h", "ago"]]
+    assert [cells[2:4] for cells in rows.values()] == [["2m", "ago"], ["3h", "ago"], ["4h", "ago"], ["5h", "ago"]]
 
 
-def test_doctor_calls_a_sensor_that_never_appended_dark(bare_ledger: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_doctor_calls_a_sensor_that_never_appended_dark(
+    bare_ledger: Path, wired_agents: None, capsys: pytest.CaptureFixture[str]
+) -> None:
     seed(bare_ledger, poll(ago(minutes=2)), mark(ago(hours=2), "active"))
     rows = per_sensor(doctor(capsys, 2))
-    assert rows["beat"] == ["never", "-", "dark"]
-    assert [cells[-1] for cells in rows.values()] == ["live", "dark", "live"]
+    assert rows["beat claude"] == ["never", "-", "dark"]
+    assert [cells[-1] for cells in rows.values()] == ["live", "dark", "dark", "live"]
+
+
+def test_doctor_calls_one_agent_dark_while_the_other_still_beats(
+    bare_ledger: Path, wired_agents: None, capsys: pytest.CaptureFixture[str]
+) -> None:
+    seed(bare_ledger, poll(ago(minutes=2)), beat(ago(hours=3), "~/code/blog", "pi"), mark(ago(hours=5), "idle"))
+    rows = per_sensor(doctor(capsys, 2))
+    assert rows["beat claude"] == ["never", "-", "dark"]
+    assert rows["beat pi"][2:] == ["3h", "ago", "live"]
+
+
+def test_doctor_makes_no_darkness_claim_for_an_unwired_agent(
+    bare_ledger: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    seed(bare_ledger, poll(ago(minutes=2)), mark(ago(hours=2), "active"))
+    rows = per_sensor(doctor(capsys, 0))
+    assert [rows["beat claude"][-1], rows["beat pi"][-1]] == ["unknown", "unknown"]
 
 
 def test_doctor_calls_a_sensor_that_went_quiet_mid_ledger_dark(
-    bare_ledger: Path, capsys: pytest.CaptureFixture[str]
+    bare_ledger: Path, wired_agents: None, capsys: pytest.CaptureFixture[str]
 ) -> None:
     seed(bare_ledger, poll(ago(days=9)), beat(ago(days=9), "~/code/blog"), mark(ago(days=9), "idle"))
     seed(bare_ledger, poll(ago(minutes=2)), mark(ago(hours=2), "idle"))
-    assert per_sensor(doctor(capsys, 2))["beat"][2:] == ["9d", "ago", "dark"]
+    assert per_sensor(doctor(capsys, 2))["beat claude"][2:] == ["9d", "ago", "dark"]
 
 
 def test_doctor_on_an_empty_ledger_reports_a_dark_poll_and_judges_nothing_else(
     bare_ledger: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     rows = per_sensor(doctor(capsys, 2))
-    assert [cells[-1] for cells in rows.values()] == ["dark", "unknown", "unknown"]
+    assert [cells[-1] for cells in rows.values()] == ["dark", "unknown", "unknown", "unknown"]
     assert {cells[0] for cells in rows.values()} == {"never"}
 
 
 def test_doctor_judges_quiet_sensors_against_the_last_poll_not_the_wall_clock(
-    bare_ledger: Path, capsys: pytest.CaptureFixture[str]
+    bare_ledger: Path, wired_agents: None, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    seed(bare_ledger, poll(ago(days=14)), beat(ago(days=14, minutes=5), "~/code/blog"), mark(ago(days=14), "idle"))
+    seed(
+        bare_ledger,
+        poll(ago(days=14)),
+        beat(ago(days=14, minutes=5), "~/code/blog"),
+        beat(ago(days=14, minutes=5), "~/code/blog", "pi"),
+        mark(ago(days=14), "idle"),
+    )
     rows = per_sensor(doctor(capsys, 2))
-    assert [cells[-1] for cells in rows.values()] == ["dark", "live", "live"]
+    assert [cells[-1] for cells in rows.values()] == ["dark", "live", "live", "live"]
     assert {cells[2] for cells in rows.values()} == {"14d"}
 
 
 def test_doctor_paints_only_the_dark_row_red_and_drops_it_for_no_color(
-    bare_ledger: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    bare_ledger: Path, wired_agents: None, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     monkeypatch.setenv("FORCE_COLOR", "1")
-    seed(bare_ledger, poll(ago(minutes=2)), mark(ago(hours=2), "idle"))
-    poll_row, beat_row, idle_row = doctor(capsys, 2)[:3]
+    seed(bare_ledger, poll(ago(minutes=2)), beat(ago(hours=3), "~/code/blog", "pi"), mark(ago(hours=2), "idle"))
+    poll_row, beat_row, pi_row, idle_row = doctor(capsys, 2)[:4]
     assert (beat_row.startswith(tagwerk.RED), beat_row.endswith(tagwerk.RESET)) == (True, True)
-    assert "\033[" not in poll_row + idle_row
+    assert "\033[" not in poll_row + pi_row + idle_row
     monkeypatch.delenv("FORCE_COLOR")
     assert "\033[" not in "\n".join(doctor(capsys, 2, "--no-color"))
 
 
 def test_doctor_takes_its_darkness_threshold_from_the_config(
-    home: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    home: Path, wired_agents: None, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     (home / "config.toml").write_text(f'data_dir = "{home}/data"\nsensor_dark_h = 1\n')
     monkeypatch.setenv("TAGWERK_CONFIG", str(home / "config.toml"))
-    seed(home / "data", poll(ago(minutes=2)), beat(ago(hours=3), "~/code/blog"), mark(ago(minutes=3), "idle"))
-    assert [cells[-1] for cells in per_sensor(doctor(capsys, 2)).values()] == ["live", "dark", "live"]
+    seed(
+        home / "data",
+        poll(ago(minutes=2)),
+        beat(ago(hours=3), "~/code/blog"),
+        beat(ago(minutes=3), "~/code/blog", "pi"),
+        mark(ago(minutes=3), "idle"),
+    )
+    assert [cells[-1] for cells in per_sensor(doctor(capsys, 2)).values()] == ["live", "dark", "live", "live"]
 
 
 def test_doctor_findings_go_to_stdout(bare_ledger: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -2038,11 +2085,7 @@ def test_doctor_findings_go_to_stdout(bare_ledger: Path, capsys: pytest.CaptureF
     assert tagwerk.main(["doctor"]) == 2
     captured = capsys.readouterr()
     assert captured.err == ""
-    assert captured.out.splitlines().index("") == 3
-
-
-WIRED = json.loads((CONTRIB / "claude-hooks.json").read_text())
-BARE = {"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "echo done"}]}]}}
+    assert captured.out.splitlines().index("") == 4
 
 
 def test_doctor_reports_both_agent_hooks_wired(
@@ -2111,12 +2154,14 @@ def test_doctor_cannot_tell_when_the_claude_settings_hold_unexpected_json(
 
 
 def test_doctor_keeps_its_exit_code_when_a_dark_sensor_meets_unwired_hooks(
-    bare_ledger: Path, capsys: pytest.CaptureFixture[str]
+    bare_ledger: Path, home: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
+    claude_settings(home, WIRED)
     seed(bare_ledger, poll(ago(minutes=2)), mark(ago(hours=2), "idle"))
     rows = doctor(capsys, 2)
-    assert per_sensor(rows)["beat"] == ["never", "-", "dark"]
-    assert per_piece(rows) == {"claude hooks": "unknown", "pi extension": "missing"}
+    assert per_sensor(rows)["beat claude"] == ["never", "-", "dark"]
+    assert per_sensor(rows)["beat pi"][-1] == "unknown"
+    assert per_piece(rows) == {"claude hooks": "wired", "pi extension": "missing"}
 
 
 TYPO_ROOT = """[roots]
@@ -2188,7 +2233,7 @@ def test_doctor_reports_a_dark_sensor_over_suspect_config(
 ) -> None:
     seed(configured_ledger(home, monkeypatch, TYPO_ROOT), poll(ago(minutes=2)))
     rows = doctor(capsys, 2)
-    assert [cells[-1] for cells in per_sensor(rows).values()] == ["live", "dark", "dark"]
+    assert [cells[-1] for cells in per_sensor(rows).values()] == ["live", "unknown", "unknown", "dark"]
     assert blocks(rows)[2][0].endswith("suspect")
 
 

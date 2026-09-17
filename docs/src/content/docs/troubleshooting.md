@@ -16,7 +16,8 @@ Every item here is known and deliberate. A dark sensor is a different problem: [
 
 ## doctor
 
-- It cannot tell a sensor that is deliberately unwired from one with a wiring fault, so a machine that runs no agents reports `beat` dark for good. Raise `sensor_dark_h` or read past that row.
+- A beat sensor reads `dark` only when its own agent reads `wired`, so an agent you never installed reads `unknown` instead of alarming (ADR-0013).
+- The Claude check reads `~/.claude/settings.json` only, so a hook wired in a project's own `.claude/settings.json` reads `missing` and its beats then go unjudged rather than dark.
 - It judges a root by whether it is a directory right now, so a root on an unmounted drive reads `suspect` until you mount it. That costs a row and exit 3, never a number in a report.
 - It tests each `[[title]]` pattern against every title on its own, so a pattern permanently shadowed by an earlier one still reads clear. Attribution takes the first match, and replaying that order across the whole ledger would cost more than the typo it would catch.
 - Exit 2 is shared with argparse, which spends it on a usage error, so `tagwerk doctor --bogus` alarms a shell prompt exactly as a dark sensor does.

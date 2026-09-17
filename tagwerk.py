@@ -44,7 +44,6 @@ PALETTE = (166, 36, 176, 61, 142)
 CATCH_ALLS = ("general", "other")
 ROOT_GONE = "no such directory; its minutes book to a shorter root or personal/other"
 TITLE_UNMATCHED = "no ledger title matched; either the app never ran or it books elsewhere"
-SENSORS = (("poll", ("focus",)), ("beat", ("beat",)), ("idle mark", ("idle", "active")))
 CLAUDE_HOOKS_INSTALL = r"""jq -s '.[1].hooks as $add | .[0] | .hooks = reduce ($add | keys[]) as $k (.hooks // {}; .[$k] = ((.[$k] // []) + $add[$k] | unique))' \
   ~/.claude/settings.json /usr/share/tagwerk/claude-hooks.json > ~/.claude/settings.json.new \
   && mv ~/.claude/settings.json.new ~/.claude/settings.json"""
@@ -664,8 +663,12 @@ def format_age(age: timedelta) -> str:
     return f"{minutes // (24 * 60)}d"
 
 
+def sensor_mark(event: Event) -> str:
+    return f"beat:{event['src']}" if event["ev"] == "beat" else event["ev"]
+
+
 def last_seen(events: list[Event]) -> dict[str, datetime]:
-    return {event["ev"]: datetime.fromisoformat(event["ts"]) for event in events}
+    return {sensor_mark(event): datetime.fromisoformat(event["ts"]) for event in events}
 
 
 def verdict(last: datetime | None, against: datetime | None, dark_after: timedelta) -> str:
@@ -690,15 +693,27 @@ def check_pi_extension() -> tuple[str, str]:
     return ("wired", "") if Path(PI_LINK).expanduser().exists() else ("missing", PI_INSTALL)
 
 
-def sensor_rows(config: Config, seen: dict[str, datetime], now: datetime) -> list[Finding]:
+AGENTS = (("claude", "claude hooks", check_claude_hooks), ("pi", "pi extension", check_pi_extension))
+
+
+def agent_wiring() -> list[tuple[str, Wiring]]:
+    return [(src, Wiring(name, *check())) for src, name, check in AGENTS]
+
+
+def sensor_marks(wired: set[str]) -> list[tuple[str, tuple[str, ...], bool]]:
+    beats = [(f"beat {src}", (f"beat:{src}",), src in wired) for src, _, _ in AGENTS]
+    return [("poll", ("focus",), True), *beats, ("idle mark", ("idle", "active"), True)]
+
+
+def sensor_rows(config: Config, seen: dict[str, datetime], wired: set[str], now: datetime) -> list[Finding]:
     rows = []
-    for sensor, marks in SENSORS:
+    for sensor, marks, judged in sensor_marks(wired):
         last = max((seen[mark] for mark in marks if mark in seen), default=None)
         # ponytail: the poller is the reference, so it alone measures against now; the rest need a poll to be judged
         against = now if "focus" in marks else seen.get("focus")
         when = f"{last.astimezone():%Y-%m-%d %H:%M}" if last else "never"
         age = f"{format_age(now - last)} ago" if last else "-"
-        rows.append(Finding(sensor, when, age, verdict(last, against, config.sensor_dark)))
+        rows.append(Finding(sensor, when, age, verdict(last, against if judged else None, config.sensor_dark)))
     return rows
 
 
@@ -719,10 +734,12 @@ def cmd_doctor(config: Config) -> int:
     now = datetime.now(UTC)
     # ponytail: scans every month file for the last event per sensor and every title, like import-timew
     events = read_events(config.data_dir, EPOCH, now)
-    sensors = sensor_rows(config, last_seen(events), now)
+    wiring = agent_wiring()
+    wired = {src for src, piece in wiring if piece.verdict == "wired"}
+    sensors = sensor_rows(config, last_seen(events), wired, now)
     for row, line in zip(sensors, render_rows(sensors), strict=True):
         print(paint(line, RED) if row.verdict == "dark" else line)
-    pieces = [Wiring("claude hooks", *check_claude_hooks()), Wiring("pi extension", *check_pi_extension())]
+    pieces = [piece for _, piece in wiring]
     width = max(len(piece.name) for piece in pieces)
     print()
     for piece in pieces:

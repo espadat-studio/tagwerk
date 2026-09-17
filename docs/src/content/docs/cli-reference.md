@@ -111,6 +111,6 @@ Write the commented config template to `~/.config/tagwerk/config.toml`. It refus
 
 ### `tagwerk doctor`
 
-One row per sensor (`poll`, `beat`, `idle mark`) with its last event and a `live`, `dark` or `unknown` verdict. Then whether each agent hook is `wired`. Then any `suspect` root or title pattern.
+One row per sensor (`poll`, `beat claude`, `beat pi`, `idle mark`) with its last event and a `live`, `dark` or `unknown` verdict. An agent whose wiring does not read `wired` reads `unknown`, because its silence is already explained. Then whether each agent hook is `wired`. Then any `suspect` root or title pattern.
 
 Exits 2 on a dark sensor and 3 on suspect config alone. [Verification](/getting-started/verification/) reads the whole output.
