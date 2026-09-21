@@ -17,7 +17,7 @@ description = "Run pytest then mypy strict on the module"
 run = ["uv run pytest -q", "uv run mypy --strict tagwerk.py"]
 
 [tools]
-"aqua:astral-sh/uv" = "0.12.15"
+"aqua:astral-sh/uv" = "0.12.17"
 "aqua:dprint/dprint" = "0.57.4"
 # hk 2 moved the mise registry default to the packslip backend, which writes no
 # urls or checksums to mise.lock, so `mise install --locked` cannot resolve it.
