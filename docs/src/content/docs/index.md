@@ -21,7 +21,7 @@ Nothing in the ledger is ever edited. A fix is a new span appended after the fac
 
 ## How a minute is credited
 
-A minute is present when you are not idle and a poll landed within the last 2 minutes. Present minutes are credited exactly once, so a day's total equals wall-clock presence.
+A minute is present when you are not idle and a poll landed within the last 2 minutes. Each leased kind is credited a whole present minute, so a day's total meets wall-clock presence and rises above it on a day spent in two kinds at once.
 
 An agent beat leases its repo for 10 minutes. A focused terminal's cwd, or a window title naming a repo, leases for 1 minute. A leased repo keeps earning while an unrelated window is focused — a browser tab during a long agent turn still books to the repo. Two leased repos split each minute evenly.
 

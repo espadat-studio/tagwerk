@@ -97,11 +97,11 @@ A minute in which the user is at the machine: neither idle nor absent.
 _Avoid_: active, online, worked
 
 **Credited**:
-A minute booked to a bucket: every present minute, plus every minute covered by a span of any kind but off. Off spans and non-present minutes are never credited.
+A minute booked to a bucket: every present minute, plus every minute covered by a span of any kind but off. Off spans and non-present minutes are never credited. A present minute is credited once per leased kind, so credited totals run at or above presence.
 _Avoid_: worked, logged, tracked
 
 **Lease**:
-The period after a repo signal (a beat, a focused terminal's cwd, a GitHub title) during which that repo is eligible for credit. A present minute is split evenly across all leased repos.
+The period after a repo signal (a beat, a focused terminal's cwd, a GitHub title) during which that repo is eligible for credit. A present minute is whole to each leased kind and split evenly among that kind's repos.
 _Avoid_: window, TTL, timeout
 
 **Ambient bucket**:

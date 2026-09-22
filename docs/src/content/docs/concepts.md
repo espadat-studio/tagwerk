@@ -7,7 +7,7 @@ Sensors append events. Attribution turns those events into credited minutes. Rep
 
 ## A minute is present, absent or idle
 
-A minute is **present** when you are not idle and a poll landed within the last `poll_stale_min`. Present minutes are credited exactly once, so a day's total equals wall-clock presence.
+A minute is **present** when you are not idle and a poll landed within the last `poll_stale_min`. Each leased kind is credited a whole present minute, so a day's total meets wall-clock presence and rises above it on a day spent in two kinds at once.
 
 A minute is **absent** when no poll proves the machine was on: powered off, suspended, or the poller is dead. A minute is **idle** between an `idle` event and the next `active` event from the idle listener. Suspend is idle. Neither is ever credited.
 
@@ -25,7 +25,9 @@ A repo signal grants that repo a **lease**: a period during which it is eligible
 
 A lease is what lets a leased repo keep earning while an unrelated window is focused: a browser tab read during a long agent turn still books to the repo the agent is working in.
 
-When two repos hold a lease over the same present minute, they split it evenly ([ADR-0003](https://github.com/espadat-studio/tagwerk/blob/master/meta/adr/0003-even-split-attribution.md)). Three repos split it three ways. The split is even because no signal tagwerk can see says which of two concurrent agent turns deserved more of the minute, and inventing a weight would be inventing a number.
+When two repos of the same kind hold a lease over the same present minute, they split it evenly. Three split it three ways. The split is even because no signal tagwerk can see says which of two concurrent agent turns deserved more of the minute, and inventing a weight would be inventing a number.
+
+Kinds do not split against each other. Each kind holding a lease takes the whole minute ([ADR-0018](https://github.com/espadat-studio/tagwerk/blob/master/meta/adr/0018-a-minute-is-whole-to-each-kind.md)). An agent running in a work repo beside one in a personal repo credits a full minute to each, because the minute really was both and only `work` reaches the invoice. Totals therefore run above presence on a day spent in two kinds at once; `day --json` reports presence separately as `present_minutes`.
 
 Beats while idle book nothing, so an unattended overnight agent adds no hours. Credit resumes on the still-valid lease when you return.
 
