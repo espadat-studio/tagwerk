@@ -121,7 +121,22 @@ def run(capsys: pytest.CaptureFixture[str], *argv: str) -> list[list[str]]:
 
 def table(capsys: pytest.CaptureFixture[str], *argv: str) -> list[list[str]]:
     rows = run(capsys, *argv)
-    return rows[rows.index([]) + 1 :]
+    return strip_present(rows[rows.index([]) + 1 :])
+
+
+def strip_present(rows: list[list[str]]) -> list[list[str]]:
+    # Every table ends in a present row. Its value is pinned by the presence tests, not by every attribution test.
+    assert rows[-1][0] == "present"
+    return rows[:-1]
+
+
+def day_table(capsys: pytest.CaptureFixture[str], *argv: str) -> list[list[str]]:
+    return strip_present(run(capsys, "day", *argv))
+
+
+def present_row(rows: list[list[str]]) -> str:
+    assert rows[-1][0] == "present"
+    return rows[-1][1]
 
 
 def hours(day: datetime, count: float, project: str = "assets", kind: str = "work") -> Event:
@@ -256,7 +271,7 @@ def test_missing_config_exits_with_its_path(tmp_path: Path, monkeypatch: pytest.
 
 def test_fix_then_day_shows_booked_hours(data_dir: Path, capsys: pytest.CaptureFixture[str]) -> None:
     run(capsys, "fix", "09:00", "10:30", "assets")
-    assert run(capsys, "day") == [["work/assets", "1:30"], ["work", "1:30"], ["total", "1:30"]]
+    assert day_table(capsys) == [["work/assets", "1:30"], ["work", "1:30"], ["total", "1:30"]]
 
 
 def test_fix_appends_one_utc_span_line_to_the_utc_month_file(
@@ -289,7 +304,7 @@ def test_fix_for_a_past_month_is_filed_under_that_month(data_dir: Path, capsys: 
 def test_latest_appended_span_wins_on_overlap(data_dir: Path, capsys: pytest.CaptureFixture[str]) -> None:
     run(capsys, "fix", "09:00", "10:00", "assets")
     run(capsys, "fix", "09:30", "10:00", "auberge", "--kind", "personal")
-    assert run(capsys, "day") == [
+    assert day_table(capsys) == [
         ["work/assets", "0:30"],
         ["personal/auberge", "0:30"],
         ["work", "0:30"],
@@ -303,7 +318,7 @@ def test_a_late_span_crossing_a_month_wins_over_one_appended_earlier(
     run(capsys, "fix", "2026-09-01T02:00", "2026-09-01T05:00", "auberge")
     run(capsys, "fix", "2026-08-31T23:00", "2026-09-01T04:00", "assets")
     assert sorted(path.name for path in data_dir.glob("*.jsonl")) == ["2026-08.jsonl", "2026-09.jsonl"]
-    assert run(capsys, "day", "2026-09-01") == [
+    assert day_table(capsys, "2026-09-01") == [
         ["work/assets", "4:00"],
         ["work/auberge", "1:00"],
         ["work", "5:00"],
@@ -323,7 +338,7 @@ def test_personal_rows_follow_work_rows_regardless_of_minutes(
 ) -> None:
     run(capsys, "fix", "09:00", "09:30", "assets")
     run(capsys, "fix", "10:00", "12:00", "auberge", "--kind", "personal")
-    assert run(capsys, "day") == [
+    assert day_table(capsys) == [
         ["work/assets", "0:30"],
         ["personal/auberge", "2:00"],
         ["work", "0:30"],
@@ -352,7 +367,7 @@ def test_table_rows_name_the_kind_so_two_kinds_general_rows_stay_apart(
 def test_off_span_removes_booked_minutes(data_dir: Path, capsys: pytest.CaptureFixture[str]) -> None:
     run(capsys, "fix", "09:00", "10:00", "assets")
     run(capsys, "fix", "09:30", "10:00", "lunch", "--kind", "off")
-    assert run(capsys, "day") == [["work/assets", "0:30"], ["work", "0:30"], ["total", "0:30"]]
+    assert day_table(capsys) == [["work/assets", "0:30"], ["work", "0:30"], ["total", "0:30"]]
 
 
 def test_fix_accepts_an_explicit_local_date(data_dir: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -360,7 +375,7 @@ def test_fix_accepts_an_explicit_local_date(data_dir: Path, capsys: pytest.Captu
     yesterday = today - timedelta(days=1)
     run(capsys, "fix", f"{today}T09:00", f"{today}T09:45", "assets")
     run(capsys, "fix", f"{yesterday}T09:00", f"{yesterday}T12:00", "assets")
-    assert run(capsys, "day") == [["work/assets", "0:45"], ["work", "0:45"], ["total", "0:45"]]
+    assert day_table(capsys) == [["work/assets", "0:45"], ["work", "0:45"], ["total", "0:45"]]
 
 
 def test_fix_books_the_named_kind_and_defaults_to_work(data_dir: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -368,7 +383,7 @@ def test_fix_books_the_named_kind_and_defaults_to_work(data_dir: Path, capsys: p
     run(capsys, "fix", "10:00", "11:00", "assets")
     [ledger] = data_dir.glob("*.jsonl")
     assert [json.loads(line)["kind"] for line in ledger.read_text().splitlines()] == ["fixed", "work"]
-    assert run(capsys, "day") == [
+    assert day_table(capsys) == [
         ["work/assets", "1:00"],
         ["fixed/auberge", "1:00"],
         ["work", "2:00"],
@@ -456,7 +471,7 @@ def test_config_defaults_to_xdg_config_home(
     config.write_text(f'data_dir = "{home}/data"\n')
     monkeypatch.setenv("XDG_CONFIG_HOME", str(home / "xdg"))
     run(capsys, "fix", "09:00", "10:00", "assets")
-    assert run(capsys, "day") == [["work/assets", "1:00"], ["work", "1:00"], ["total", "1:00"]]
+    assert day_table(capsys) == [["work/assets", "1:00"], ["work", "1:00"], ["total", "1:00"]]
 
 
 def test_config_flag_overrides_the_env(
@@ -466,7 +481,7 @@ def test_config_flag_overrides_the_env(
     config.write_text(f'data_dir = "{home}/data"\n')
     monkeypatch.setenv("TAGWERK_CONFIG", str(home / "nope.toml"))
     run(capsys, "--config", str(config), "fix", "09:00", "10:00", "assets")
-    assert run(capsys, "--config", str(config), "day") == [
+    assert strip_present(run(capsys, "--config", str(config), "day")) == [
         ["work/assets", "1:00"],
         ["work", "1:00"],
         ["total", "1:00"],
@@ -501,7 +516,7 @@ def test_init_writes_the_template_once_and_it_books_into_the_expanded_home(
     assert captured.out == ""
     assert captured.err.splitlines() == [f"wrote {config}"]
     run(capsys, "fix", "09:00", "10:00", "assets")
-    assert run(capsys, "day") == [["work/assets", "1:00"], ["work", "1:00"], ["total", "1:00"]]
+    assert day_table(capsys) == [["work/assets", "1:00"], ["work", "1:00"], ["total", "1:00"]]
     assert len(list((home / ".local/share/tagwerk").glob("*.jsonl"))) == 1
     with pytest.raises(SystemExit, match=re.escape(str(config))):
         tagwerk.main(["init"])
@@ -512,7 +527,7 @@ def test_today_is_retired_and_day_replaced_it(data_dir: Path, capsys: pytest.Cap
     with pytest.raises(SystemExit) as raised:
         tagwerk.main(["today"])
     assert raised.value.code
-    assert run(capsys, "day") == [["work", "0:00"], ["total", "0:00"]]
+    assert day_table(capsys) == [["work", "0:00"], ["total", "0:00"]]
 
 
 def test_month_with_an_empty_ledger_prints_zero_totals(ledger: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -612,7 +627,7 @@ def test_invoice_rounds_the_true_total_not_the_per_project_minutes(
     home: Path, ledger: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     seed(ledger, *present(T0, 7), beat(T0, f"{home}/code/work-org/assets"), beat(T0, f"{home}/code/work-org/checkout"))
-    assert run(capsys, "month", "2026-08")[-2:] == [["work", "0:07"], ["total", "0:07"]]
+    assert run(capsys, "month", "2026-08")[-3:-1] == [["work", "0:07"], ["total", "0:07"]]
     assert lines(capsys, "invoice", "2026-08") == [
         "| Project | Hours |",
         "| --- | ---: |",
@@ -691,8 +706,8 @@ def test_ago_zero_equals_omitting_the_period(data_dir: Path, capsys: pytest.Capt
 def test_ago_one_selects_the_previous_day(data_dir: Path, capsys: pytest.CaptureFixture[str]) -> None:
     yesterday = datetime.now(UTC).astimezone().date() - timedelta(days=1)
     run(capsys, "fix", f"{yesterday}T09:00", f"{yesterday}T10:00", "assets")
-    assert run(capsys, "day", "--ago", "1") == [["work/assets", "1:00"], ["work", "1:00"], ["total", "1:00"]]
-    assert run(capsys, "day") == [["work", "0:00"], ["total", "0:00"]]
+    assert day_table(capsys, "--ago", "1") == [["work/assets", "1:00"], ["work", "1:00"], ["total", "1:00"]]
+    assert day_table(capsys) == [["work", "0:00"], ["total", "0:00"]]
 
 
 def test_ago_one_selects_the_previous_week(data_dir: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -774,7 +789,7 @@ def test_day_json_carries_the_buckets_subtotals_cap_and_verdict(
         ],
         "paid_minutes": 90,
         "total_minutes": 110,
-        "present_minutes": 0,
+        "present_minutes": 110,
         "cap_minutes": 480,
         "over_cap": False,
     }
@@ -785,7 +800,7 @@ def test_day_json_figures_equal_the_same_runs_table(data_dir: Path, capsys: pyte
     run(capsys, "fix", "10:20", "11:05", "auberge", "--kind", "fixed")
     run(capsys, "fix", "11:05", "12:00", "blog", "--kind", "personal")
     parsed = day_json(capsys)
-    rows = run(capsys, "day")
+    rows = day_table(capsys)
     assert [
         [f"{bucket['kind']}/{bucket['project']}", tagwerk.format_hours(bucket["minutes"])]
         for bucket in parsed["buckets"]
@@ -822,7 +837,7 @@ def test_day_json_buckets_round_one_by_one_so_they_need_not_sum_to_the_total(
     parsed = day_json(capsys, "2026-08-05")
     assert [bucket["minutes"] for bucket in parsed["buckets"]] == [4, 4]
     assert (parsed["paid_minutes"], parsed["total_minutes"], parsed["present_minutes"]) == (9, 9, 9)
-    assert run(capsys, "day", "2026-08-05") == [
+    assert day_table(capsys, "2026-08-05") == [
         ["work/assets", "0:04"],
         ["work/checkout", "0:04"],
         ["work", "0:09"],
@@ -973,6 +988,51 @@ def test_day_json_presence_stays_below_a_total_two_kinds_shared(
     seed(ledger, *present(T0, 10), beat(T0, f"{home}/code/work-org/assets"), beat(T0, f"{home}/code/auberge"))
     parsed = day_json(capsys, "2026-08-05")
     assert (parsed["paid_minutes"], parsed["total_minutes"], parsed["present_minutes"]) == (10, 20, 10)
+
+
+def test_presence_counts_a_shared_minute_once(home: Path, ledger: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    seed(ledger, *present(T0, 10), beat(T0, f"{home}/code/work-org/assets"), beat(T0, f"{home}/code/auberge"))
+    rows = run(capsys, "day", "2026-08-05")
+    assert [row for row in rows if row[0] in ("total", "present")] == [["total", "0:20"], ["present", "0:10"]]
+
+
+def test_presence_drops_the_idle_stretch(home: Path, ledger: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    seed(
+        ledger,
+        *present(T0, 15),
+        beat(T0, f"{home}/code/work-org/assets"),
+        mark(T0 + 5 * MINUTE, "idle"),
+        mark(T0 + 8 * MINUTE, "active"),
+    )
+    assert present_row(run(capsys, "day", "2026-08-05")) == "0:12"
+
+
+def test_an_off_span_takes_its_minutes_out_of_presence(data_dir: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    run(capsys, "fix", "09:00", "10:00", "assets")
+    assert present_row(run(capsys, "day")) == "1:00"
+    run(capsys, "fix", "09:30", "10:00", "away", "--kind", "off")
+    assert present_row(run(capsys, "day")) == "0:30"
+
+
+def test_the_day_cap_measures_presence_not_the_credited_total(
+    home: Path, ledger: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # 10 present minutes credited to two kinds total 20, which alone would trip a 15-minute cap.
+    (home / ".config/tagwerk/config.toml").write_text(SAMPLE_CONFIG.replace("day_cap_h = 8", "day_cap_h = 0.25"))
+    seed(ledger, *present(T0, 10), beat(T0, f"{home}/code/work-org/assets"), beat(T0, f"{home}/code/auberge"))
+    [out] = lines(capsys, "day", "--json", "2026-08-05")
+    parsed = json.loads(out)
+    assert (parsed["total_minutes"], parsed["present_minutes"], parsed["cap_minutes"]) == (20, 10, 15)
+    assert parsed["over_cap"] is False
+
+
+def test_a_week_row_runs_to_presence_not_the_credited_total(
+    home: Path, ledger: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    seed(ledger, *present(T0, 60), beat(T0, f"{home}/code/work-org/assets"), beat(T0, f"{home}/code/auberge"))
+    rows = [line.split() for line in lines(capsys, "week", "2026-W32")]
+    wednesday = next(row for row in rows if row[:2] == ["Wed", "05"])
+    assert wednesday[-1] == "1:00"
 
 
 def test_a_beat_lease_expires_after_beat_lease_min(
@@ -1654,7 +1714,7 @@ def test_imported_spans_are_reported_by_day(data_dir: Path, tmp_path: Path, caps
         ],
     )
     run(capsys, "import-timew", "--work-tag", "acme", str(export))
-    assert run(capsys, "day") == [["work/x", "1:00"], ["personal/y", "2:00"], ["work", "1:00"], ["total", "3:00"]]
+    assert day_table(capsys) == [["work/x", "1:00"], ["personal/y", "2:00"], ["work", "1:00"], ["total", "3:00"]]
 
 
 def test_import_timew_skips_open_intervals(data_dir: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -2094,6 +2154,7 @@ def test_month_shows_one_bar_per_iso_week_that_agrees_with_the_table(
         ["personal/auberge", "1:00"],
         ["work", "5:00"],
         ["total", "6:00"],
+        ["present", "6:00"],
     ]
 
 

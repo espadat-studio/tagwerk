@@ -313,7 +313,9 @@ def read_events(data_dir: Path, start: datetime, end: datetime) -> list[Event]:
     return sorted(events, key=lambda event: event["ts"])
 
 
-def attribute(config: Config, events: list[Event], start: datetime, end: datetime) -> dict[date, dict[Bucket, float]]:
+def attribute(
+    config: Config, events: list[Event], start: datetime, end: datetime
+) -> tuple[dict[date, dict[Bucket, float]], dict[date, int]]:
     spans = [
         (
             datetime.fromisoformat(event["start"]),
@@ -326,6 +328,7 @@ def attribute(config: Config, events: list[Event], start: datetime, end: datetim
     spans.reverse()
     stream = [(datetime.fromisoformat(event["ts"]), event) for event in events if event["ev"] != "span"]
     days: defaultdict[date, dict[Bucket, float]] = defaultdict(lambda: defaultdict(float))
+    present: defaultdict[date, int] = defaultdict(int)
     idle = False
     last_poll: datetime | None = None
     ambient: Bucket | None = None
@@ -354,11 +357,15 @@ def attribute(config: Config, events: list[Event], start: datetime, end: datetim
         leases = {bucket: expiry for bucket, expiry in leases.items() if expiry > minute}
         # ponytail: the latest span covering a minute wins wholesale; no partial merge with sensor minutes
         booked = next((bucket for span_start, span_end, bucket in spans if span_start <= minute < span_end), None)
+        local = minute.astimezone().date()
         if booked is not None:
+            # A span overrides the sensors for its whole range, presence included.
             if booked.kind != "off":
-                days[minute.astimezone().date()][booked] += 1.0
+                days[local][booked] += 1.0
+                present[local] += 1
         elif not idle and last_poll is not None and minute - last_poll < config.poll_stale:
-            credited = days[minute.astimezone().date()]
+            present[local] += 1
+            credited = days[local]
             if leases:
                 by_kind: defaultdict[str, list[Bucket]] = defaultdict(list)
                 for bucket in leases:
@@ -369,30 +376,7 @@ def attribute(config: Config, events: list[Event], start: datetime, end: datetim
             else:
                 credited[ambient or OTHER] += 1.0
         minute += timedelta(minutes=1)
-    return days
-
-
-def present_minutes(config: Config, events: list[Event], start: datetime, end: datetime) -> int:
-    stream = [(datetime.fromisoformat(event["ts"]), event) for event in events if event["ev"] != "span"]
-    idle = False
-    last_poll: datetime | None = None
-    applied = 0
-    minute = start
-    present = 0
-    while minute < end:
-        while applied < len(stream) and stream[applied][0] <= minute:
-            ts, event = stream[applied]
-            applied += 1
-            if event["ev"] == "idle":
-                idle = True
-            elif event["ev"] == "active":
-                idle = False
-            elif event["ev"] == "focus":
-                last_poll = ts
-        if not idle and last_poll is not None and minute - last_poll < config.poll_stale:
-            present += 1
-        minute += timedelta(minutes=1)
-    return present
+    return days, present
 
 
 def merge(parts: Iterable[dict[Bucket, float]]) -> dict[Bucket, float]:
@@ -468,16 +452,17 @@ def paid_minutes(minutes: dict[Bucket, float]) -> float:
     return sum(credited for bucket, credited in minutes.items() if bucket.kind in PAID)
 
 
-def render_table(minutes: dict[Bucket, float]) -> str:
+def render_table(minutes: dict[Bucket, float], present: int) -> str:
     cells = [(f"{bucket.kind}/{bucket.project}", format_hours(credited)) for bucket, credited in ranked(minutes)]
     cells.append(("work", format_hours(paid_minutes(minutes))))
     cells.append(("total", format_hours(sum(minutes.values()))))
+    cells.append(("present", format_hours(present)))
     name_width = max(len(name) for name, _ in cells)
     hours_width = max(len(hours) for _, hours in cells)
     return "\n".join(f"{name:<{name_width}}  {hours:>{hours_width}}" for name, hours in cells)
 
 
-def render_json(minutes: dict[Bucket, float], day: date, cap_h: float, present: int) -> str:
+def render_json(minutes: dict[Bucket, float], present: int, day: date, cap_h: float) -> str:
     total, cap = round(sum(minutes.values())), round(cap_h * 60)
     return json.dumps(
         {
@@ -490,7 +475,7 @@ def render_json(minutes: dict[Bucket, float], day: date, cap_h: float, present: 
             "total_minutes": total,
             "present_minutes": present,
             "cap_minutes": cap,
-            "over_cap": total > cap,
+            "over_cap": present > cap,
         }
     )
 
@@ -503,7 +488,7 @@ def quarter_hours(minutes: dict[str, float]) -> dict[str, float]:
     return {project: count / 4 for project, count in quarters.items()}
 
 
-def render_invoice(minutes: dict[Bucket, float]) -> str:
+def render_invoice(minutes: dict[Bucket, float], _present: int) -> str:
     hours = quarter_hours({bucket.project: credited for bucket, credited in minutes.items() if bucket.kind == "work"})
     rows = sorted(hours.items(), key=lambda row: (-row[1], row[0]))
     lines = ["| Project | Hours |", "| --- | ---: |"]
@@ -549,11 +534,15 @@ def render_bar(minutes: dict[Bucket, float], scale_h: float, cap_h: float) -> st
     return "".join(paint(char * len(list(run)), code) for (char, code), run in groupby(cells))
 
 
-def bar_line(label: str, minutes: dict[Bucket, float], scale_h: float, cap_h: float, weekend: bool = False) -> str:
+def bar_line(
+    label: str, minutes: dict[Bucket, float], present: int, scale_h: float, cap_h: float, weekend: bool = False
+) -> str:
+    # The bar is the burnout view, so it runs to presence; the buckets only set the proportions inside it.
     total = sum(minutes.values())
-    over_cap = total > cap_h * 60 or (weekend and total > 0)
+    shown = {bucket: credited * present / total for bucket, credited in minutes.items()} if total else {}
+    over_cap = present > cap_h * 60 or (weekend and present > 0)
     return (
-        f"{paint(label, RED) if over_cap else label}  {render_bar(minutes, scale_h, cap_h)}  {format_hours(total):>5}"
+        f"{paint(label, RED) if over_cap else label}  {render_bar(shown, scale_h, cap_h)}  {format_hours(present):>5}"
     )
 
 
@@ -684,18 +673,28 @@ def cmd_beat(config: Config, src: str, cwd: str | None) -> None:
     stamp.touch()
 
 
-def credited_days(config: Config, start: datetime, end: datetime) -> dict[date, dict[Bucket, float]]:
+def credited_days(
+    config: Config, start: datetime, end: datetime
+) -> tuple[dict[date, dict[Bucket, float]], dict[date, int]]:
     return attribute(config, read_events(config.data_dir, start, end), start, end)
 
 
-def report(config: Config, start: datetime, end: datetime, render: Callable[[dict[Bucket, float]], str]) -> None:
-    print(render(merge(credited_days(config, start, end).values())))
+def report(config: Config, start: datetime, end: datetime, render: Callable[[dict[Bucket, float], int], str]) -> None:
+    days, present = credited_days(config, start, end)
+    print(render(merge(days.values()), sum(present.values())))
 
 
 def cmd_week(config: Config, monday: date) -> None:
-    days = credited_days(config, *local_range(monday, monday + timedelta(days=7)))
+    days, present = credited_days(config, *local_range(monday, monday + timedelta(days=7)))
     out = [
-        bar_line(f"{day:%a %d}", days.get(day, {}), DAY_SCALE_H, config.day_cap_h, weekend=day.weekday() >= 5)
+        bar_line(
+            f"{day:%a %d}",
+            days.get(day, {}),
+            present.get(day, 0),
+            DAY_SCALE_H,
+            config.day_cap_h,
+            weekend=day.weekday() >= 5,
+        )
         for day in days_between(monday, monday + timedelta(days=7))
     ]
     paid = paid_minutes(merge(days.values()))
@@ -705,14 +704,18 @@ def cmd_week(config: Config, monday: date) -> None:
 
 
 def cmd_month(config: Config, first: date) -> None:
-    days = credited_days(config, *local_month(first))
+    days, present = credited_days(config, *local_month(first))
     weeks: defaultdict[tuple[int, int], list[dict[Bucket, float]]] = defaultdict(list)
+    seen: defaultdict[tuple[int, int], int] = defaultdict(int)
     for day in days_between(first, next_month(first)):
-        weeks[(day.isocalendar().year, day.isocalendar().week)].append(days.get(day, {}))
+        week = (day.isocalendar().year, day.isocalendar().week)
+        weeks[week].append(days.get(day, {}))
+        seen[week] += present.get(day, 0)
     bars = [
-        bar_line(f"W{week:02d}", merge(parts), WEEK_SCALE_H, config.week_cap_h) for (_, week), parts in weeks.items()
+        bar_line(f"W{key[1]:02d}", merge(parts), seen[key], WEEK_SCALE_H, config.week_cap_h)
+        for key, parts in weeks.items()
     ]
-    print("\n".join([*bars, "", render_table(merge(days.values()))]))
+    print("\n".join([*bars, "", render_table(merge(days.values()), sum(present.values()))]))
 
 
 def format_age(age: timedelta) -> str:
@@ -877,7 +880,7 @@ def main(argv: list[str]) -> int:
         help="one JSON object instead of the table: day, then buckets, each one kind, project and rounded "
         "minutes in table order, then paid_minutes (work plus fixed), total_minutes, present_minutes (minutes "
         "at the machine, below total_minutes when kinds ran in parallel), cap_minutes (the day cap) "
-        "and over_cap (total_minutes above cap_minutes)",
+        "and over_cap (present_minutes above cap_minutes: the day cap is a presence threshold)",
     )
     week = commands.add_parser(
         "week", parents=[plain], help="one bar per day, Monday to Sunday, with the day and week caps"
@@ -943,12 +946,10 @@ def main(argv: list[str]) -> int:
         cmd_import_timew(config, args.work_tag, args.file)
     elif args.command == "day":
         selected = args.period or local_today() - timedelta(days=args.ago)
-        start, end = local_day(selected)
-        render: Callable[[dict[Bucket, float]], str] = render_table
-        if args.json:
-            present = present_minutes(config, read_events(config.data_dir, start, end), start, end)
-            render = partial(render_json, day=selected, cap_h=config.day_cap_h, present=present)
-        report(config, start, end, render)
+        render: Callable[[dict[Bucket, float], int], str] = (
+            partial(render_json, day=selected, cap_h=config.day_cap_h) if args.json else render_table
+        )
+        report(config, *local_day(selected), render)
     elif args.command == "doctor":
         return cmd_doctor(config)
     return 0
