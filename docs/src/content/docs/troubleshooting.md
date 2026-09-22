@@ -30,7 +30,7 @@ Every item here is known and deliberate. A dark sensor is a different problem: [
 
 - Colours come from five hues that pass the contrast check, so past five work repos two projects share one.
 - Reports rescan the month files on every run. A month is about 43k minutes and a few thousand events, which is fine for years of data.
-- `day --json` judges `over_cap` on the whole minutes it prints, while the `week` bar reddens on the raw total. A day landing within half a minute of the cap can read over in one and under in the other. Self-consistent JSON was worth more than agreement at that boundary.
+- `day --json` judges `over_cap` on a rounded cap, while the `week` bar reddens on the unrounded one. Both measure presence, so they agree except on a fractional `day_cap_h` within half a minute of the boundary.
 
 ## Bar widget
 

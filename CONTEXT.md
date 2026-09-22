@@ -93,7 +93,7 @@ No poll recently enough to prove the machine was on: powered off, suspended, or 
 _Avoid_: offline, gap
 
 **Present**:
-A minute in which the user is at the machine: neither idle nor absent.
+A minute in which the user is at the machine: neither idle nor absent. A span of any kind but off asserts presence for its range, because a span overrides the sensors and the sensors are what decide presence. Every bar and the day cap measure presence; one minute counts once however many kinds it was credited to.
 _Avoid_: active, online, worked
 
 **Credited**:
@@ -115,7 +115,7 @@ The stretch of days one report covers, named in that report's own unit: a day, a
 _Avoid_: range, window, timeframe, span
 
 **Cap**:
-A daily or weekly threshold above which reports highlight the period. The day cap measures every credited minute, the week cap only the paid ones. Caps change colours, never numbers.
+A daily or weekly threshold above which reports highlight the period. The day cap measures presence, the week cap only the paid minutes. Caps change colours, never numbers.
 _Avoid_: limit, quota, budget
 
 **Invoice**:
