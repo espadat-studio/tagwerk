@@ -360,12 +360,39 @@ def attribute(config: Config, events: list[Event], start: datetime, end: datetim
         elif not idle and last_poll is not None and minute - last_poll < config.poll_stale:
             credited = days[minute.astimezone().date()]
             if leases:
+                by_kind: defaultdict[str, list[Bucket]] = defaultdict(list)
                 for bucket in leases:
-                    credited[bucket] += 1 / len(leases)
+                    by_kind[bucket.kind].append(bucket)
+                for peers in by_kind.values():
+                    for bucket in peers:
+                        credited[bucket] += 1 / len(peers)
             else:
                 credited[ambient or OTHER] += 1.0
         minute += timedelta(minutes=1)
     return days
+
+
+def present_minutes(config: Config, events: list[Event], start: datetime, end: datetime) -> int:
+    stream = [(datetime.fromisoformat(event["ts"]), event) for event in events if event["ev"] != "span"]
+    idle = False
+    last_poll: datetime | None = None
+    applied = 0
+    minute = start
+    present = 0
+    while minute < end:
+        while applied < len(stream) and stream[applied][0] <= minute:
+            ts, event = stream[applied]
+            applied += 1
+            if event["ev"] == "idle":
+                idle = True
+            elif event["ev"] == "active":
+                idle = False
+            elif event["ev"] == "focus":
+                last_poll = ts
+        if not idle and last_poll is not None and minute - last_poll < config.poll_stale:
+            present += 1
+        minute += timedelta(minutes=1)
+    return present
 
 
 def merge(parts: Iterable[dict[Bucket, float]]) -> dict[Bucket, float]:
@@ -450,7 +477,7 @@ def render_table(minutes: dict[Bucket, float]) -> str:
     return "\n".join(f"{name:<{name_width}}  {hours:>{hours_width}}" for name, hours in cells)
 
 
-def render_json(minutes: dict[Bucket, float], day: date, cap_h: float) -> str:
+def render_json(minutes: dict[Bucket, float], day: date, cap_h: float, present: int) -> str:
     total, cap = round(sum(minutes.values())), round(cap_h * 60)
     return json.dumps(
         {
@@ -461,6 +488,7 @@ def render_json(minutes: dict[Bucket, float], day: date, cap_h: float) -> str:
             ],
             "paid_minutes": round(paid_minutes(minutes)),
             "total_minutes": total,
+            "present_minutes": present,
             "cap_minutes": cap,
             "over_cap": total > cap,
         }
@@ -847,7 +875,8 @@ def main(argv: list[str]) -> int:
         "--json",
         action="store_true",
         help="one JSON object instead of the table: day, then buckets, each one kind, project and rounded "
-        "minutes in table order, then paid_minutes (work plus fixed), total_minutes, cap_minutes (the day cap) "
+        "minutes in table order, then paid_minutes (work plus fixed), total_minutes, present_minutes (minutes "
+        "at the machine, below total_minutes when kinds ran in parallel), cap_minutes (the day cap) "
         "and over_cap (total_minutes above cap_minutes)",
     )
     week = commands.add_parser(
@@ -914,10 +943,12 @@ def main(argv: list[str]) -> int:
         cmd_import_timew(config, args.work_tag, args.file)
     elif args.command == "day":
         selected = args.period or local_today() - timedelta(days=args.ago)
-        render: Callable[[dict[Bucket, float]], str] = (
-            partial(render_json, day=selected, cap_h=config.day_cap_h) if args.json else render_table
-        )
-        report(config, *local_day(selected), render)
+        start, end = local_day(selected)
+        render: Callable[[dict[Bucket, float]], str] = render_table
+        if args.json:
+            present = present_minutes(config, read_events(config.data_dir, start, end), start, end)
+            render = partial(render_json, day=selected, cap_h=config.day_cap_h, present=present)
+        report(config, start, end, render)
     elif args.command == "doctor":
         return cmd_doctor(config)
     return 0

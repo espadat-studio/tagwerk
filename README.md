@@ -12,7 +12,7 @@ Every CLI time tracker is manual, and manual discipline is what killed the timew
 | hypridle     | `tagwerk idle` and `tagwerk active` from the idle listener and around sleep                                                                                                             |
 | Agent hooks  | Claude Code hooks and a pi extension run `tagwerk beat` with the agent's cwd                                                                                                            |
 | Ledger       | `~/.local/share/tagwerk/YYYY-MM.jsonl`, append-only, UTC timestamps                                                                                                                     |
-| Attribution  | a present minute is split evenly across leased repos, else the ambient bucket, else `personal/other`                                                                                    |
+| Attribution  | a present minute is whole to each leased kind, split within one, else the ambient bucket, else `personal/other`                                                                         |
 | Reports      | `day`, `week`, `month`, `invoice`; `fix` appends a span                                                                                                                                 |
 | Bar widget   | an Omarchy plugin drawing today's credited hours against the day cap, from `tagwerk day --json`; its code lives in [omarchy-tagwerk](https://github.com/espadat-studio/omarchy-tagwerk) |
 

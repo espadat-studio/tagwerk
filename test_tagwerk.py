@@ -774,6 +774,7 @@ def test_day_json_carries_the_buckets_subtotals_cap_and_verdict(
         ],
         "paid_minutes": 90,
         "total_minutes": 110,
+        "present_minutes": 0,
         "cap_minutes": 480,
         "over_cap": False,
     }
@@ -820,7 +821,7 @@ def test_day_json_buckets_round_one_by_one_so_they_need_not_sum_to_the_total(
     seed(ledger, *present(T0, 9), beat(T0, f"{home}/code/work-org/assets"), beat(T0, f"{home}/code/work-org/checkout"))
     parsed = day_json(capsys, "2026-08-05")
     assert [bucket["minutes"] for bucket in parsed["buckets"]] == [4, 4]
-    assert (parsed["paid_minutes"], parsed["total_minutes"]) == (9, 9)
+    assert (parsed["paid_minutes"], parsed["total_minutes"], parsed["present_minutes"]) == (9, 9, 9)
     assert run(capsys, "day", "2026-08-05") == [
         ["work/assets", "0:04"],
         ["work/checkout", "0:04"],
@@ -837,6 +838,7 @@ def test_day_json_for_an_empty_day_has_no_buckets_and_zero_subtotals(
         "buckets": [],
         "paid_minutes": 0,
         "total_minutes": 0,
+        "present_minutes": 0,
         "cap_minutes": 480,
         "over_cap": False,
     }
@@ -932,6 +934,45 @@ def test_beats_in_two_repos_split_each_minute_evenly(
         ["work", "0:10"],
         ["total", "0:10"],
     ]
+
+
+def test_leases_of_two_kinds_each_take_the_whole_minute(
+    home: Path, ledger: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    seed(ledger, *present(T0, 10), beat(T0, f"{home}/code/work-org/assets"), beat(T0, f"{home}/code/auberge"))
+    assert table(capsys, "month", "2026-08") == [
+        ["work/assets", "0:10"],
+        ["personal/auberge", "0:10"],
+        ["work", "0:10"],
+        ["total", "0:20"],
+    ]
+
+
+def test_a_personal_lease_never_dilutes_the_paid_subtotal(
+    home: Path, ledger: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    seed(
+        ledger,
+        *present(T0, 10),
+        beat(T0, f"{home}/code/work-org/assets"),
+        beat(T0, f"{home}/code/work-org/checkout"),
+        beat(T0, f"{home}/code/auberge"),
+    )
+    assert table(capsys, "month", "2026-08") == [
+        ["work/assets", "0:05"],
+        ["work/checkout", "0:05"],
+        ["personal/auberge", "0:10"],
+        ["work", "0:10"],
+        ["total", "0:20"],
+    ]
+
+
+def test_day_json_presence_stays_below_a_total_two_kinds_shared(
+    home: Path, ledger: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    seed(ledger, *present(T0, 10), beat(T0, f"{home}/code/work-org/assets"), beat(T0, f"{home}/code/auberge"))
+    parsed = day_json(capsys, "2026-08-05")
+    assert (parsed["paid_minutes"], parsed["total_minutes"], parsed["present_minutes"]) == (10, 20, 10)
 
 
 def test_a_beat_lease_expires_after_beat_lease_min(
