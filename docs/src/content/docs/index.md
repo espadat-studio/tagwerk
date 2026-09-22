@@ -40,7 +40,7 @@ Beats while idle book nothing, so an unattended overnight agent adds no hours.
 | `personal` |             no             |       no       |
 | `off`      |             no             |       no       |
 
-A fixed-price customer's hours belong in the burnout check and never on an hourly customer's bill. The day cap asks a different question and no kind answers it: it counts every credited minute, `personal` included, because burnout does not care who paid for the hour.
+A fixed-price customer's hours belong in the burnout check and never on an hourly customer's bill. The day cap asks a different question and no kind answers it: it counts presence, `personal` included, because burnout does not care who paid for the hour.
 
 A kind never names the payer.
 

@@ -51,7 +51,7 @@ With no repo holding a lease, the focused window decides, and what it implies is
 
 `work` and `fixed` are both paid: both drive the week cap and both land in the `work` subtotal that the `day` and `month` tables print. Only `work` reaches `tagwerk invoice`, so fixed-price hours show up in the burnout check and never on an hourly customer's bill ([ADR-0006](https://github.com/espadat-studio/tagwerk/blob/master/meta/adr/0006-kind-splits-paid-from-invoiced.md)).
 
-The day cap measures every credited minute instead, `personal` included, because burnout does not care who paid for the hour ([ADR-0011](https://github.com/espadat-studio/tagwerk/blob/master/meta/adr/0011-the-day-cap-measures-presence-the-week-cap-paid.md)).
+The day cap measures presence instead, `personal` included, because burnout does not care who paid for the hour ([ADR-0011](https://github.com/espadat-studio/tagwerk/blob/master/meta/adr/0011-the-day-cap-measures-presence-the-week-cap-paid.md)). Every bar runs to presence too, so a minute worked in two kinds lengthens no bar twice ([ADR-0019](https://github.com/espadat-studio/tagwerk/blob/master/meta/adr/0019-the-bars-measure-presence.md)). The `day` and `month` tables print both: `total` is what was credited, `present` is what the clock saw.
 
 A kind never names the payer. Two customers billed differently are two projects under one kind, not two kinds.
 

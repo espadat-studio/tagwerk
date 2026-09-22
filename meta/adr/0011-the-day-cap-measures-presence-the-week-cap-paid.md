@@ -1,5 +1,7 @@
 # The day cap measures presence, the week cap measures paid
 
+The rule stands; its implementation as "every credited minute" was corrected in [ADR-0019](https://github.com/espadat-studio/tagwerk/blob/master/meta/adr/0019-the-bars-measure-presence.md) once ADR-0018 parted the two numbers.
+
 `bar_line` reddens a day when every credited minute exceeds `day_cap_h`, while the `week` footer reddens only when `work` plus `fixed` exceed `week_cap_h`. Two thresholds wearing one word, and ADR-0006 recorded the paid rule as "the caps" when it had changed the footer alone and never revisited the bars. The day cap stays a presence threshold and the week cap stays paid: the README names the two consumers as an invoice and a burnout check, and burnout does not care who paid for the hour, so personal coding until 1am has to count, while a forty-hour week is a claim about paid work and nothing else.
 
 Rejected: making both caps paid, which is the tidier sentence and the one the glossary already claimed, but it blinds the day signal to exactly the hours a burnout check exists to catch, and it would retire a test that deliberately reddens a Tuesday of five work hours plus four personal ones. Rejected: making both caps total, which keeps one rule at the price of a week footer labelled `work` that counts minutes no customer will ever see.
