@@ -25,6 +25,12 @@
       "groupName": "hk"
     },
     {
+      "description": "mise installs python from python-build-standalone, which publishes a CPython patch a few days after python.org; bumping earlier breaks mise lock and mise install --locked",
+      "matchManagers": ["mise"],
+      "matchDepNames": ["python"],
+      "minimumReleaseAge": "3 days"
+    },
+    {
       "description": "docs/ is the Starlight site, not the packaged tool. config:recommended types npm `dependencies` bumps as fix; nothing under docs/ reaches usr/bin/tagwerk, so they stay chore",
       "matchManagers": ["npm"],
       "semanticCommitType": "chore",
